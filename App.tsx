@@ -15,7 +15,8 @@ import StudentCourseRegistrationsPage from './pages/StudentCourseRegistrationsPa
 import SessionCoursesPage from './pages/SessionCoursesPage';
 import SessionHallsPage from './pages/SessionHallsPage';
 import SessionStudentsPage from './pages/SessionStudentsPage';
-import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, StudentCourseRegistration, StudentHallAssignment } from './types';
+import TeachersPage from './pages/TeachersPage';
+import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, StudentCourseRegistration, StudentHallAssignment } from './types';
 import { 
   BellIcon, 
   CogIcon, 
@@ -34,6 +35,12 @@ const initialSchoolsData: School[] = [
     { id: 'S001', name: 'Mühendislik ve Doğa Bilimleri Fakültesi', description: 'İleri teknoloji ve temel bilimler üzerine eğitim verir.', contact: 'mdbf@example.edu.tr' },
     { id: 'S002', name: 'İktisadi ve İdari Bilimler Fakültesi', description: 'Ekonomi, işletme ve uluslararası ilişkiler alanlarında uzman yetiştirir.', contact: 'iibf@example.edu.tr' },
     { id: 'S003', name: 'Tıp Fakültesi', description: 'Modern tıp eğitimi ve araştırmaları yapar.', contact: 'tip@example.edu.tr' },
+];
+
+const initialTeachersData: Teacher[] = [
+    { id: 'T001', title: 'Prof. Dr.', firstName: 'Ahmet', lastName: 'Yılmaz', email: 'ahmet.yilmaz@example.edu.tr', phone: '05551112233', schoolId: 'S001' },
+    { id: 'T002', title: 'Doç. Dr.', firstName: 'Ayşe', lastName: 'Demir', email: 'ayse.demir@example.edu.tr', phone: '05554445566', schoolId: 'S001' },
+    { id: 'T003', title: 'Dr. Öğr. Üyesi', firstName: 'Mehmet', lastName: 'Kaya', email: 'mehmet.kaya@example.edu.tr', phone: '05557778899', schoolId: 'S002' },
 ];
 
 const allDepartmentsData: Department[] = [
@@ -55,10 +62,10 @@ const allHallsData: Hall[] = [
 ];
 
 const allCoursesData: Course[] = [
-    { id: 'C001', name: 'Programlamaya Giriş', code: 'BM101', departmentId: 'D001' },
-    { id: 'C002', name: 'Veri Yapıları', code: 'BM201', departmentId: 'D001' },
-    { id: 'C003', name: 'Termodinamik', code: 'MM205', departmentId: 'D002' },
-    { id: 'C004', name: 'İktisada Giriş', code: 'ISL101', departmentId: 'D003' },
+    { id: 'C001', name: 'Programlamaya Giriş', code: 'BM101', departmentId: 'D001', teacherId: 'T001' },
+    { id: 'C002', name: 'Veri Yapıları', code: 'BM201', departmentId: 'D001', teacherId: 'T002' },
+    { id: 'C003', name: 'Termodinamik', code: 'MM205', departmentId: 'D002', teacherId: 'T001' },
+    { id: 'C004', name: 'İktisada Giriş', code: 'ISL101', departmentId: 'D003', teacherId: 'T003' },
 ];
 
 const initialExamsData: Exam[] = [
@@ -133,8 +140,9 @@ const App: React.FC = () => {
   const [examHalls, setExamHalls] = useState<ExamHall[]>(initialExamHallsData);
   const [sessionHalls, setSessionHalls] = useState<SessionHall[]>(initialSessionHallsData);
   
-  // Student and Registration State
+  // Student, Teacher and Registration State
   const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>(initialTeachersData);
   const [studentCourseRegistrations, setStudentCourseRegistrations] = useState<StudentCourseRegistration[]>([]);
   
   // Student Hall Assignments
@@ -387,6 +395,18 @@ const App: React.FC = () => {
         );
     };
 
+    // --- Teacher CRUD Handlers ---
+    const handleAddTeacher = (teacherData: Omit<Teacher, 'id'>) => {
+        const newTeacher: Teacher = { id: `T${Date.now()}`, ...teacherData };
+        setTeachers([newTeacher, ...teachers]);
+    };
+    const handleUpdateTeacher = (updatedTeacher: Teacher) => {
+        setTeachers(teachers.map(t => t.id === updatedTeacher.id ? updatedTeacher : t));
+    };
+    const handleDeleteTeacher = (teacherId: string) => {
+        setTeachers(teachers.filter(t => t.id !== teacherId));
+    };
+
 
   const renderContent = () => {
     switch (activePage.page) {
@@ -433,9 +453,19 @@ const App: React.FC = () => {
                     allSchools={schools}
                     allDepartments={departments}
                     allCourses={courses}
+                    teachers={teachers} // Passed teachers
                     onAdd={handleAddCourse}
                     onUpdate={handleUpdateCourse}
                     onDelete={handleDeleteCourse}
+                    onNavigate={handleNavigate}
+               />;
+      case 'teachers':
+        return <TeachersPage
+                    teachers={teachers}
+                    schools={schools} // Passed schools
+                    onAdd={handleAddTeacher}
+                    onUpdate={handleUpdateTeacher}
+                    onDelete={handleDeleteTeacher}
                     onNavigate={handleNavigate}
                />;
       case 'exams':

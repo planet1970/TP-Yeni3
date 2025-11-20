@@ -27,7 +27,7 @@ const navItemsYonetim: NavItemType[] = [
   { id: 'buildings', name: 'Binalar', icon: BuildingIcon, path: '#' },
   { id: 'halls', name: 'Salonlar', icon: HallIcon, path: '#' },
   { id: 'courses', name: 'Dersler', icon: CourseIcon, path: '#' },
-  { id: 'students', name: 'Öğrenciler', icon: UsersIcon, path: '#' },
+  { id: 'teachers', name: 'Öğretmenler', icon: UsersIcon, path: '#' },
 ];
 
 const navItemsSinav: NavItemType[] = [

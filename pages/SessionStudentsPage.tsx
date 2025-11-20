@@ -34,6 +34,27 @@ const PlacementModal: React.FC<{
     const [isPlaced, setIsPlaced] = useState(false);
     const [expandedHallId, setExpandedHallId] = useState<string | null>(null);
 
+    // Helper to calculate proportional distribution
+    const calculateProportionalDistribution = () => {
+        const totalCapacity = assignedHalls.reduce((sum, h) => sum + h.capacity, 0);
+        if (totalCapacity === 0) return {};
+
+        const newDist: Record<string, number> = {};
+        let assignedSoFar = 0;
+        
+        assignedHalls.forEach((hall, index) => {
+            if (index === assignedHalls.length - 1) {
+                 // Last hall gets the remainder
+                 newDist[hall.id] = Math.max(0, studentCount - assignedSoFar);
+            } else {
+                const count = Math.floor((hall.capacity / totalCapacity) * studentCount);
+                newDist[hall.id] = count;
+                assignedSoFar += count;
+            }
+        });
+        return newDist;
+    };
+
     // Initialize distributions on mount
     useEffect(() => {
         // If we already have existing assignments, use them
@@ -54,23 +75,7 @@ const PlacementModal: React.FC<{
             setIsPlaced(true);
         } else {
             // Initial Proportional Distribution
-            const totalCapacity = assignedHalls.reduce((sum, h) => sum + h.capacity, 0);
-            if (totalCapacity === 0) return;
-
-            const newDist: Record<string, number> = {};
-            let assignedSoFar = 0;
-            
-            assignedHalls.forEach((hall, index) => {
-                if (index === assignedHalls.length - 1) {
-                     // Last hall gets the remainder
-                     newDist[hall.id] = Math.max(0, studentCount - assignedSoFar);
-                } else {
-                    const count = Math.floor((hall.capacity / totalCapacity) * studentCount);
-                    newDist[hall.id] = count;
-                    assignedSoFar += count;
-                }
-            });
-            setDistributions(newDist);
+            setDistributions(calculateProportionalDistribution());
         }
     }, [assignedHalls, studentCount, existingAssignments, allStudents]);
 
@@ -108,6 +113,16 @@ const PlacementModal: React.FC<{
 
         setPlacements(newPlacements);
         setIsPlaced(true);
+    };
+
+    const handleReset = () => {
+        if (window.confirm("Yerleşimi sıfırlamak üzeresiniz. Mevcut atamalar temizlenecek ve salon öğrenci sayıları varsayılan kapasite oranlarına dönecektir. Onaylıyor musunuz?")) {
+            // Reset assignments completely
+            setDistributions(calculateProportionalDistribution());
+            setPlacements({});
+            setIsPlaced(false);
+            setExpandedHallId(null);
+        }
     };
 
     const handleSave = () => {
@@ -156,7 +171,7 @@ const PlacementModal: React.FC<{
                             </p>
                             {!isValidTotal && (
                                 <span className="text-xs text-red-500 font-medium">
-                                    {totalDistributed < studentCount ? `${studentCount - totalDistributed} Eksik` : `${totalDistributed - studentCount} Fazla`}
+                                    {totalDistributed < studentCount ? `${Number(studentCount) - Number(totalDistributed)} Eksik` : `${Number(totalDistributed) - Number(studentCount)} Fazla`}
                                 </span>
                             )}
                         </div>
@@ -180,10 +195,10 @@ const PlacementModal: React.FC<{
                                         <input
                                             type="number"
                                             min="0"
-                                            disabled={isPlaced && existingAssignments.length > 0} // Disable edit if already saved (optional, can enable re-shuffle)
+                                            disabled={isPlaced} // Disable edit if placed, force Reset first
                                             value={distributions[hall.id] || 0}
                                             onChange={(e) => handleDistributionChange(hall.id, e.target.value)}
-                                            className="w-20 px-2 py-1 border rounded text-center focus:ring-orange-500 focus:border-orange-500"
+                                            className={`w-20 px-2 py-1 border rounded text-center focus:ring-orange-500 focus:border-orange-500 ${isPlaced ? 'bg-gray-100' : ''}`}
                                         />
                                     </div>
                                 </div>
@@ -222,6 +237,16 @@ const PlacementModal: React.FC<{
                     >
                         İptal
                     </button>
+                    
+                    {isPlaced && (
+                         <button 
+                            onClick={handleReset}
+                            className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
+                        >
+                            Sıfırla
+                        </button>
+                    )}
+
                     {!isPlaced && (
                         <button 
                             onClick={handlePlaceStudents}
@@ -233,12 +258,13 @@ const PlacementModal: React.FC<{
                             Yerleştir
                         </button>
                     )}
+                    
                     {isPlaced && (
                          <button 
                             onClick={handleSave}
                             className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium"
                         >
-                            Tamam
+                            Tamam (Kaydet)
                         </button>
                     )}
                 </div>

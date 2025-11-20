@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { EditIcon, TrashIcon } from '../components/icons';
-import type { Course, School, Department } from '../types';
+import type { Course, School, Department, Teacher } from '../types';
 
 interface CoursesPageProps {
     allSchools: School[];
     allDepartments: Department[];
     allCourses: Course[];
+    teachers: Teacher[]; // Passed from App
     onAdd: (course: Omit<Course, 'id'>) => void;
     onUpdate: (course: Course) => void;
     onDelete: (courseId: string) => void;
@@ -15,15 +16,17 @@ interface CoursesPageProps {
 
 const CourseForm: React.FC<{
     course: Partial<Course> | null;
+    teachers: Teacher[]; // Filtered teachers list
     onSave: (course: Omit<Course, 'id' | 'departmentId'> & { id?: string }) => void;
     onCancel: () => void;
-}> = ({ course, onSave, onCancel }) => {
+}> = ({ course, teachers, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         name: course?.name || '',
         code: course?.code || '',
+        teacherId: course?.teacherId || '',
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -58,6 +61,24 @@ const CourseForm: React.FC<{
                         className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                         required
                     />
+                    <div className="md:col-span-2">
+                         <label htmlFor="teacherId" className="block text-sm font-medium text-gray-700 mb-1">Öğretmen</label>
+                         <select
+                            name="teacherId"
+                            id="teacherId"
+                            value={formData.teacherId}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                            required
+                        >
+                            <option value="">-- Öğretmen Seçiniz --</option>
+                            {teachers.map(t => (
+                                <option key={t.id} value={t.id}>
+                                    {t.title} {t.firstName} {t.lastName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
                 <div className="flex justify-end space-x-3 mt-4">
                     <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium">
@@ -76,6 +97,7 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
     allSchools, 
     allDepartments, 
     allCourses, 
+    teachers,
     onAdd, 
     onUpdate, 
     onDelete, 
@@ -105,6 +127,11 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
         if (!selectedSchoolId) return [];
         return allDepartments.filter(d => d.schoolId === selectedSchoolId);
     }, [allDepartments, selectedSchoolId]);
+
+    const availableTeachers = useMemo(() => {
+        if (!selectedSchoolId) return [];
+        return teachers.filter(t => t.schoolId === selectedSchoolId);
+    }, [teachers, selectedSchoolId]);
 
     const filteredCourses = useMemo(() => {
         if (!selectedDepartmentId) return [];
@@ -140,6 +167,12 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
     const handleCancel = () => {
         setIsFormVisible(false);
         setEditingCourse(null);
+    };
+
+    const getTeacherName = (teacherId?: string) => {
+        if (!teacherId) return '-';
+        const teacher = teachers.find(t => t.id === teacherId);
+        return teacher ? `${teacher.title} ${teacher.firstName} ${teacher.lastName}` : '-';
     };
     
     return (
@@ -182,7 +215,7 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
                         )}
                     </div>
 
-                    {isFormVisible && <CourseForm course={editingCourse} onSave={handleSave} onCancel={handleCancel} />}
+                    {isFormVisible && <CourseForm course={editingCourse} teachers={availableTeachers} onSave={handleSave} onCancel={handleCancel} />}
 
                     <div className="bg-white rounded-xl shadow-md overflow-hidden">
                         <div className="overflow-x-auto">
@@ -191,6 +224,7 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
                                     <tr>
                                         <th scope="col" className="px-6 py-3">Ders Adı</th>
                                         <th scope="col" className="px-6 py-3">Ders Kodu</th>
+                                        <th scope="col" className="px-6 py-3">Öğretmen</th>
                                         <th scope="col" className="px-6 py-3 text-right">İşlemler</th>
                                     </tr>
                                 </thead>
@@ -199,6 +233,7 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
                                         <tr key={course.id} className="bg-white border-b hover:bg-gray-50">
                                             <td className="px-6 py-4 font-medium text-gray-900">{course.name}</td>
                                             <td className="px-6 py-4">{course.code}</td>
+                                            <td className="px-6 py-4">{getTeacherName(course.teacherId)}</td>
                                             <td className="px-6 py-4 text-right space-x-2">
                                                 <button onClick={() => handleEdit(course)} className="p-2 rounded-md text-gray-400 hover:bg-gray-100 hover:text-green-600 transition-colors" title="Güncelle">
                                                     <EditIcon className="h-5 w-5" />
@@ -211,7 +246,7 @@ const CoursesPage: React.FC<CoursesPageProps> = ({
                                     ))}
                                     {filteredCourses.length === 0 && (
                                         <tr>
-                                            <td colSpan={3} className="text-center py-10 text-gray-500">Bu bölüme ait ders bulunamadı.</td>
+                                            <td colSpan={4} className="text-center py-10 text-gray-500">Bu bölüme ait ders bulunamadı.</td>
                                         </tr>
                                     )}
                                 </tbody>
