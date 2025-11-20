@@ -75,7 +75,64 @@ export interface Exam {
 
 export interface Session {
     id: string;
+    sequenceNumber: number;
     name: string;
     date: string;
     examId: string;
+    isActive: boolean;
+}
+
+export interface SessionCourse {
+    id: string;
+    sessionId: string;
+    courseId: string;
+}
+
+export interface SessionDepartment {
+    id: string;
+    sessionId: string;
+    departmentId: string;
+}
+
+export interface ExamCourse {
+    id: string;
+    examId: string;
+    courseId: string;
+    questionCount: number;
+    duration: number; // in minutes
+}
+
+export interface ExamHall {
+    id: string;
+    examId: string;
+    hallId: string;
+}
+
+export interface SessionHall {
+    id: string;
+    sessionId: string;
+    departmentId: string;
+    hallId: string;
+}
+
+export interface Student {
+    id: string;
+    studentNumber: string;
+    firstName: string;
+    lastName: string;
+}
+
+export interface StudentCourseRegistration {
+    id: string;
+    examId: string;
+    courseId: string;
+    studentId: string;
+}
+
+export interface StudentHallAssignment {
+    id: string;
+    sessionId: string;
+    departmentId: string;
+    hallId: string;
+    studentId: string;
 }

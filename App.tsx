@@ -9,7 +9,13 @@ import HallsPage from './pages/HallsPage';
 import CoursesPage from './pages/CoursesPage';
 import ExamsPage from './pages/ExamsPage';
 import SessionsPage from './pages/SessionsPage';
-import { School, Department, Building, Hall, Course, Exam, Session } from './types';
+import ExamCoursesPage from './pages/ExamCoursesPage';
+import ExamHallsPage from './pages/ExamHallsPage';
+import StudentCourseRegistrationsPage from './pages/StudentCourseRegistrationsPage';
+import SessionCoursesPage from './pages/SessionCoursesPage';
+import SessionHallsPage from './pages/SessionHallsPage';
+import SessionStudentsPage from './pages/SessionStudentsPage';
+import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, StudentCourseRegistration, StudentHallAssignment } from './types';
 import { 
   BellIcon, 
   CogIcon, 
@@ -61,10 +67,17 @@ const initialExamsData: Exam[] = [
 ];
 
 const allSessionsData: Session[] = [
-    { id: 'SS001', name: '1. Oturum - Sabah', date: '2024-11-20T09:00', examId: 'E001' },
-    { id: 'SS002', name: '2. Oturum - Öğleden Sonra', date: '2024-11-20T14:00', examId: 'E001' },
-    { id: 'SS003', name: 'Final 1. Oturum', date: '2025-01-20T10:00', examId: 'E002' },
+    { id: 'SS001', sequenceNumber: 1, name: '1. Oturum - Sabah', date: '2024-11-20T09:00', examId: 'E001', isActive: true },
+    { id: 'SS002', sequenceNumber: 2, name: '2. Oturum - Öğleden Sonra', date: '2024-11-20T14:00', examId: 'E001', isActive: true },
+    { id: 'SS003', sequenceNumber: 1, name: 'Final 1. Oturum', date: '2025-01-20T10:00', examId: 'E002', isActive: false },
 ];
+
+const initialSessionCoursesData: SessionCourse[] = [];
+
+const initialExamCoursesData: ExamCourse[] = [];
+const initialExamHallsData: ExamHall[] = [];
+const initialSessionDepartmentsData: SessionDepartment[] = [];
+const initialSessionHallsData: SessionHall[] = [];
 
 
 const Header: React.FC = () => {
@@ -114,6 +127,18 @@ const App: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>(allCoursesData);
   const [exams, setExams] = useState<Exam[]>(initialExamsData);
   const [sessions, setSessions] = useState<Session[]>(allSessionsData);
+  const [sessionCourses, setSessionCourses] = useState<SessionCourse[]>(initialSessionCoursesData);
+  const [sessionDepartments, setSessionDepartments] = useState<SessionDepartment[]>(initialSessionDepartmentsData);
+  const [examCourses, setExamCourses] = useState<ExamCourse[]>(initialExamCoursesData);
+  const [examHalls, setExamHalls] = useState<ExamHall[]>(initialExamHallsData);
+  const [sessionHalls, setSessionHalls] = useState<SessionHall[]>(initialSessionHallsData);
+  
+  // Student and Registration State
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentCourseRegistrations, setStudentCourseRegistrations] = useState<StudentCourseRegistration[]>([]);
+  
+  // Student Hall Assignments
+  const [studentHallAssignments, setStudentHallAssignments] = useState<StudentHallAssignment[]>([]);
 
   const handleNavigate = (pageState: PageState) => {
     setActivePage(pageState);
@@ -199,8 +224,8 @@ const App: React.FC = () => {
     };
 
   // --- Session CRUD Handlers ---
-    const handleAddSession = (sessionData: Omit<Session, 'id'>) => {
-        const newSession: Session = { id: `SS${Date.now()}`, ...sessionData };
+    const handleAddSession = (sessionData: Omit<Session, 'id' | 'isActive'>) => {
+        const newSession: Session = { id: `SS${Date.now()}`, ...sessionData, isActive: true };
         setSessions([newSession, ...sessions]);
     };
     const handleUpdateSession = (updatedSession: Session) => {
@@ -208,6 +233,158 @@ const App: React.FC = () => {
     };
     const handleDeleteSession = (sessionId: string) => {
         setSessions(sessions.filter(s => s.id !== sessionId));
+        setSessionCourses(sessionCourses.filter(sc => sc.sessionId !== sessionId));
+        setSessionDepartments(sessionDepartments.filter(sd => sd.sessionId !== sessionId));
+        setSessionHalls(sessionHalls.filter(sh => sh.sessionId !== sessionId));
+    };
+    const handleToggleSessionStatus = (sessionId: string) => {
+        setSessions(sessions.map(s => s.id === sessionId ? { ...s, isActive: !s.isActive } : s));
+    };
+
+    // --- SessionDepartment Handlers ---
+    const handleAddSessionDepartment = (sessionId: string, departmentId: string) => {
+        if (sessionDepartments.some(sd => sd.sessionId === sessionId && sd.departmentId === departmentId)) {
+            return;
+        }
+        const newSD: SessionDepartment = {
+            id: `SD${Date.now()}`,
+            sessionId,
+            departmentId
+        };
+        setSessionDepartments([...sessionDepartments, newSD]);
+    };
+
+    const handleRemoveSessionDepartment = (sessionId: string, departmentId: string) => {
+        setSessionDepartments(sessionDepartments.filter(sd => !(sd.sessionId === sessionId && sd.departmentId === departmentId)));
+        // Also remove associated halls for this session-dept
+        setSessionHalls(sessionHalls.filter(sh => !(sh.sessionId === sessionId && sh.departmentId === departmentId)));
+    };
+
+    // --- SessionCourse Handlers ---
+    const handleAddSessionCourse = (sessionId: string, courseId: string) => {
+        if (sessionCourses.some(sc => sc.sessionId === sessionId && sc.courseId === courseId)) {
+            return;
+        }
+        const newSC: SessionCourse = {
+            id: `SC${Date.now()}`,
+            sessionId,
+            courseId
+        };
+        setSessionCourses([...sessionCourses, newSC]);
+    };
+
+    const handleRemoveSessionCourse = (sessionId: string, courseId: string) => {
+        setSessionCourses(sessionCourses.filter(sc => !(sc.sessionId === sessionId && sc.courseId === courseId)));
+    };
+
+    // --- ExamCourse Handlers ---
+    const handleAddExamCourse = (examId: string, courseId: string, questionCount: number, duration: number) => {
+        if (examCourses.some(ec => ec.examId === examId && ec.courseId === courseId)) {
+            return;
+        }
+        const newEC: ExamCourse = {
+            id: `EC${Date.now()}`,
+            examId,
+            courseId,
+            questionCount,
+            duration
+        };
+        setExamCourses([...examCourses, newEC]);
+    };
+
+    const handleRemoveExamCourse = (examId: string, courseId: string) => {
+        setExamCourses(examCourses.filter(ec => !(ec.examId === examId && ec.courseId === courseId)));
+    };
+
+    // --- ExamHall Handlers ---
+    const handleAddExamHall = (examId: string, hallId: string) => {
+        if (examHalls.some(eh => eh.examId === examId && eh.hallId === hallId)) {
+            return;
+        }
+        const newEH: ExamHall = {
+            id: `EH${Date.now()}`,
+            examId,
+            hallId
+        };
+        setExamHalls([...examHalls, newEH]);
+    };
+
+    const handleRemoveExamHall = (examId: string, hallId: string) => {
+        setExamHalls(examHalls.filter(eh => !(eh.examId === examId && eh.hallId === hallId)));
+    };
+
+    // --- SessionHall Handlers ---
+    const handleAddSessionHall = (sessionId: string, departmentId: string, hallId: string) => {
+        if (sessionHalls.some(sh => sh.sessionId === sessionId && sh.departmentId === departmentId && sh.hallId === hallId)) {
+            return;
+        }
+        const newSH: SessionHall = {
+            id: `SH${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+            sessionId,
+            departmentId,
+            hallId
+        };
+        setSessionHalls([...sessionHalls, newSH]);
+    };
+
+    const handleRemoveSessionHall = (sessionId: string, departmentId: string, hallId: string) => {
+        setSessionHalls(sessionHalls.filter(sh => !(sh.sessionId === sessionId && sh.departmentId === departmentId && sh.hallId === hallId)));
+    };
+    
+    // --- Student Hall Assignments Handlers ---
+    const handleSaveStudentHallAssignments = (newAssignments: StudentHallAssignment[]) => {
+        if (newAssignments.length === 0) return;
+
+        const { sessionId, departmentId } = newAssignments[0];
+        
+        setStudentHallAssignments(prev => {
+            // Remove old assignments for this specific session and department
+            const filtered = prev.filter(a => !(a.sessionId === sessionId && a.departmentId === departmentId));
+            return [...filtered, ...newAssignments];
+        });
+    };
+
+    // --- Student Registration Handlers ---
+    const handleImportStudentRegistrations = (
+        newStudents: Student[], 
+        newRegistrations: Omit<StudentCourseRegistration, 'id'>[]
+    ) => {
+        setStudents(prevStudents => {
+            const existingNumbers = new Set(prevStudents.map(s => s.studentNumber));
+            const uniqueNewStudents = newStudents.filter(s => !existingNumbers.has(s.studentNumber));
+            return [...prevStudents, ...uniqueNewStudents];
+        });
+
+        setStudentCourseRegistrations(prevRegs => {
+             const addedRegs = newRegistrations.map(r => ({ ...r, id: `SCR${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }));
+             return [...prevRegs, ...addedRegs];
+        });
+    };
+
+    const handleAddSingleRegistration = (student: Student, examId: string, courseId: string) => {
+        setStudents(prev => {
+            if (prev.some(s => s.id === student.id)) return prev;
+            return [...prev, student];
+        });
+
+        setStudentCourseRegistrations(prev => {
+            if (prev.some(r => r.examId === examId && r.courseId === courseId && r.studentId === student.id)) {
+                return prev;
+            }
+            const newReg: StudentCourseRegistration = {
+                id: `SCR${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                examId,
+                courseId,
+                studentId: student.id
+            };
+            return [...prev, newReg];
+        });
+    };
+
+    const handleRemoveRegistration = (examId: string, courseId: string, studentId: string) => {
+        setStudentCourseRegistrations(prev => 
+            prev.filter(r => !(r.examId === examId && r.courseId === courseId && r.studentId === studentId))
+        );
     };
 
 
@@ -275,10 +452,88 @@ const App: React.FC = () => {
                     initialExamId={activePage.context?.examId}
                     allExams={exams}
                     allSessions={sessions}
+                    allDepartments={departments}
+                    sessionDepartments={sessionDepartments}
                     onAdd={handleAddSession}
                     onUpdate={handleUpdateSession}
                     onDelete={handleDeleteSession}
+                    onToggleStatus={handleToggleSessionStatus}
                     onNavigate={handleNavigate}
+                    onAddSessionDepartment={handleAddSessionDepartment}
+                    onRemoveSessionDepartment={handleRemoveSessionDepartment}
+                />;
+      case 'exam-courses':
+          return <ExamCoursesPage
+                    exams={exams}
+                    schools={schools}
+                    departments={departments}
+                    courses={courses}
+                    examCourses={examCourses}
+                    onAddExamCourse={handleAddExamCourse}
+                    onRemoveExamCourse={handleRemoveExamCourse}
+                />;
+      case 'exam-halls':
+          return <ExamHallsPage
+                    exams={exams}
+                    buildings={buildings}
+                    halls={halls}
+                    examHalls={examHalls}
+                    onAddExamHall={handleAddExamHall}
+                    onRemoveExamHall={handleRemoveExamHall}
+                />;
+      case 'student-registrations':
+          return <StudentCourseRegistrationsPage
+                    exams={exams}
+                    courses={courses}
+                    examCourses={examCourses}
+                    students={students}
+                    studentCourseRegistrations={studentCourseRegistrations}
+                    onImportRegistrations={handleImportStudentRegistrations}
+                    onAddSingleRegistration={handleAddSingleRegistration}
+                    onRemoveRegistration={handleRemoveRegistration}
+                />;
+      case 'session-courses':
+          return <SessionCoursesPage
+                    exams={exams}
+                    sessions={sessions}
+                    departments={departments}
+                    courses={courses}
+                    examCourses={examCourses}
+                    sessionDepartments={sessionDepartments}
+                    sessionCourses={sessionCourses}
+                    studentCourseRegistrations={studentCourseRegistrations}
+                    onAddSessionCourse={handleAddSessionCourse}
+                    onRemoveSessionCourse={handleRemoveSessionCourse}
+                />;
+      case 'session-halls':
+          return <SessionHallsPage
+                    exams={exams}
+                    sessions={sessions}
+                    departments={departments}
+                    halls={halls}
+                    courses={courses}
+                    examHalls={examHalls}
+                    sessionDepartments={sessionDepartments}
+                    sessionCourses={sessionCourses}
+                    sessionHalls={sessionHalls}
+                    studentCourseRegistrations={studentCourseRegistrations}
+                    onAddSessionHall={handleAddSessionHall}
+                    onRemoveSessionHall={handleRemoveSessionHall}
+                />;
+      case 'session-students':
+          return <SessionStudentsPage
+                    exams={exams}
+                    sessions={sessions}
+                    departments={departments}
+                    halls={halls}
+                    students={students}
+                    courses={courses}
+                    sessionDepartments={sessionDepartments}
+                    sessionHalls={sessionHalls}
+                    sessionCourses={sessionCourses}
+                    studentCourseRegistrations={studentCourseRegistrations}
+                    studentHallAssignments={studentHallAssignments}
+                    onSaveAssignments={handleSaveStudentHallAssignments}
                 />;
       default:
         return <DashboardPage />;
@@ -286,7 +541,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
+    <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
       <Sidebar activePage={activePage.page} onNavigate={handleNavigate} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />

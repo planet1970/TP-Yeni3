@@ -13,7 +13,11 @@ import {
   BuildingIcon,
   CourseIcon,
   ExamIcon,
-  HallIcon
+  HallIcon,
+  BookOpenIcon,
+  UserGroupIcon,
+  ClipboardListIcon,
+  IdentificationIcon
 } from './icons';
 
 const navItemsYonetim: NavItemType[] = [
@@ -28,7 +32,13 @@ const navItemsYonetim: NavItemType[] = [
 
 const navItemsSinav: NavItemType[] = [
   { id: 'exams', name: 'Sınavlar', icon: ExamIcon, path: '#' },
-  { id: 'sessions', name: 'Oturumlar', icon: ClockIcon, path: '#' },
+  { id: 'sessions', name: 'Sınav-Oturum', icon: ClockIcon, path: '#' },
+  { id: 'exam-courses', name: 'Sınav-Ders', icon: BookOpenIcon, path: '#' },
+  { id: 'exam-halls', name: 'Sınav-Salon', icon: HallIcon, path: '#' },
+  { id: 'student-registrations', name: 'Ders-Öğrenci', icon: UserGroupIcon, path: '#' },
+  { id: 'session-courses', name: 'Oturum-Ders', icon: ClipboardListIcon, path: '#' },
+  { id: 'session-halls', name: 'Oturum-Salon', icon: HallIcon, path: '#' },
+  { id: 'session-students', name: 'Oturum-Öğrenci', icon: IdentificationIcon, path: '#' },
 ];
 
 interface NavItemProps {
@@ -81,17 +91,16 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
   return (
-    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col p-4">
-      <div className="flex items-center justify-between p-3 mb-6">
+    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0">
+      <div className="flex items-center justify-between p-4 mb-2 shrink-0">
         <div className="flex items-center">
           <SchoolIcon className="h-8 w-8 text-orange-400" />
           <span className="text-xl font-bold ml-2">Sınav Sistemi</span>
         </div>
-        <ChevronRightIcon className="h-5 w-5 text-gray-400" />
       </div>
 
-      <nav className="flex-1">
-        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-3 px-3">Yönetim</h3>
+      <nav className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-3 mt-2">Yönetim</h3>
         <ul className="space-y-2">
           {navItemsYonetim.map((item) => (
             <NavItem 
@@ -103,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
           ))}
         </ul>
 
-        <h3 className="text-xs text-gray-400 uppercase tracking-wider mt-8 mb-3 px-3">Sınav İşlemleri</h3>
+        <h3 className="text-xs text-gray-400 uppercase tracking-wider mt-8 mb-3">Sınav İşlemleri</h3>
         <ul className="space-y-2">
           {navItemsSinav.map((item) => (
             <NavItem 
