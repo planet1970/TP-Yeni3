@@ -133,6 +133,17 @@ export interface Teacher {
     schoolId: string;
 }
 
+export interface Attendant {
+    id: string;
+    title: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    schoolId: string;
+    isActive: boolean;
+}
+
 export interface StudentCourseRegistration {
     id: string;
     examId: string;
@@ -146,4 +157,22 @@ export interface StudentHallAssignment {
     departmentId: string;
     hallId: string;
     studentId: string;
+}
+
+export interface AttendantAssignment {
+    id: string;
+    sessionId: string;
+    buildingId: string;
+    hallId?: string; // Optional, distincts hall staff vs building staff
+    roleName: string; // "Salon Başkanı", "Bina Sorumlusu" etc.
+    attendantId: string;
+    status: 'ASSIGNED' | 'ACCEPTED' | 'REJECTED';
+}
+
+export interface TaskRequest {
+    id: string;
+    attendantId: string;
+    sessionId: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    requestDate: string;
 }

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import SchoolsPage from './pages/SchoolsPage';
@@ -16,8 +16,15 @@ import SessionCoursesPage from './pages/SessionCoursesPage';
 import SessionHallsPage from './pages/SessionHallsPage';
 import SessionStudentsPage from './pages/SessionStudentsPage';
 import TeachersPage from './pages/TeachersPage';
+import AttendantsPage from './pages/AttendantsPage';
+import AttendantAssignmentsPage from './pages/AttendantAssignmentsPage';
+import SignatureListsPage from './pages/SignatureListsPage';
+import HallListsPage from './pages/HallListsPage';
 import SessionInquiryPage from './pages/SessionInquiryPage';
-import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, StudentCourseRegistration, StudentHallAssignment } from './types';
+import TaskRequestPage from './pages/TaskRequestPage';
+import TaskAcceptPage from './pages/TaskAcceptPage';
+import TaskArchivePage from './pages/TaskArchivePage';
+import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, Attendant, StudentCourseRegistration, StudentHallAssignment, AttendantAssignment, TaskRequest } from './types';
 import { 
   BellIcon, 
   CogIcon, 
@@ -31,58 +38,112 @@ interface PageState {
   context?: Record<string, any>;
 }
 
-// Initial Data moved here to be the single source of truth
-const initialSchoolsData: School[] = [
-    { id: 'S001', name: 'Mühendislik ve Doğa Bilimleri Fakültesi', description: 'İleri teknoloji ve temel bilimler üzerine eğitim verir.', contact: 'mdbf@example.edu.tr' },
-    { id: 'S002', name: 'İktisadi ve İdari Bilimler Fakültesi', description: 'Ekonomi, işletme ve uluslararası ilişkiler alanlarında uzman yetiştirir.', contact: 'iibf@example.edu.tr' },
-    { id: 'S003', name: 'Tıp Fakültesi', description: 'Modern tıp eğitimi ve araştırmaları yapar.', contact: 'tip@example.edu.tr' },
-];
+// --- Custom Hook for LocalStorage Persistence ---
+function usePersistedState<T>(key: string, initialValue: T) {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
+    }
+  });
 
-const initialTeachersData: Teacher[] = [
-    { id: 'T001', title: 'Prof. Dr.', firstName: 'Ahmet', lastName: 'Yılmaz', email: 'ahmet.yilmaz@example.edu.tr', phone: '05551112233', schoolId: 'S001' },
-    { id: 'T002', title: 'Doç. Dr.', firstName: 'Ayşe', lastName: 'Demir', email: 'ayse.demir@example.edu.tr', phone: '05554445566', schoolId: 'S001' },
-    { id: 'T003', title: 'Dr. Öğr. Üyesi', firstName: 'Mehmet', lastName: 'Kaya', email: 'mehmet.kaya@example.edu.tr', phone: '05557778899', schoolId: 'S002' },
-    { id: 'T004', title: 'Prof. Dr.', firstName: 'Canan', lastName: 'Işık', email: 'canan.isik@example.edu.tr', phone: '05559990011', schoolId: 'S003' },
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  }, [key, state]);
+
+  return [state, setState] as const;
+}
+
+// --- INITIAL DATA (Rich Mock Data based on User Scenario) ---
+
+const initialSchoolsData: School[] = [
+    { id: 'S001', name: 'Sosyal Bilimler Enstitüsü', description: 'Lisansüstü eğitim merkezi.', contact: 'sosyalbilimler@trakya.edu.tr' },
+    { id: 'S002', name: 'İktisadi ve İdari Bilimler Fakültesi', description: 'İktisat ve İşletme bölümleri.', contact: 'iibf@trakya.edu.tr' },
+    { id: 'S003', name: 'Edebiyat Fakültesi', description: 'Sosyal ve beşeri bilimler.', contact: 'edebiyat@trakya.edu.tr' },
 ];
 
 const allDepartmentsData: Department[] = [
-    { id: 'D001', name: 'Bilgisayar Mühendisliği', code: 'BM', schoolId: 'S001' },
-    { id: 'D002', name: 'Makine Mühendisliği', code: 'MM', schoolId: 'S001' },
-    { id: 'D003', name: 'İşletme', code: 'ISL', schoolId: 'S002' },
+    { id: 'D001', name: 'Yönetim ve Organizasyon', code: 'YON', schoolId: 'S001' },
+    { id: 'D002', name: 'İşletme', code: 'ISL', schoolId: 'S001' },
+    { id: 'D003', name: 'İktisat', code: 'IKT', schoolId: 'S001' },
+    { id: 'D004', name: 'Türk Dili ve Edebiyatı', code: 'EBY', schoolId: 'S003' },
 ];
 
 const initialBuildingsData: Building[] = [
-    { id: 'B001', name: 'A Blok', description: 'Mühendislik Binası' },
-    { id: 'B002', name: 'B Blok', description: 'Kütüphane ve Sosyal Tesisler' },
-    { id: 'B003', name: 'C Blok', description: 'Rektörlük Binası' },
+    { id: 'B001', name: 'Edebiyat Fakültesi - A Blok', description: 'Merkez Kampüs Girişi' },
+    { id: 'B002', name: 'İİBF - B Blok', description: 'Kütüphane Yanı' },
 ];
 
 const allHallsData: Hall[] = [
-    { id: 'H001', name: 'A-101', capacity: 50, buildingId: 'B001', floor: '1. Kat' },
-    { id: 'H002', name: 'A-102', capacity: 75, buildingId: 'B001', floor: '1. Kat' },
-    { id: 'H003', name: 'Kütüphane Okuma Salonu', capacity: 200, buildingId: 'B002', floor: 'Zemin Kat' },
+    { id: 'H001', name: '101', capacity: 40, buildingId: 'B001', floor: 'Zemin Kat' },
+    { id: 'H002', name: '102', capacity: 45, buildingId: 'B001', floor: 'Zemin Kat' },
+    { id: 'H003', name: '103', capacity: 50, buildingId: 'B001', floor: 'Zemin Kat' },
+    { id: 'H004', name: '104', capacity: 35, buildingId: 'B001', floor: 'Zemin Kat' },
+    { id: 'H005', name: 'Amfi-1', capacity: 100, buildingId: 'B002', floor: '1. Kat' },
+];
+
+const initialTeachersData: Teacher[] = [
+    { id: 'T001', title: 'Prof. Dr.', firstName: 'Ahmet', lastName: 'Yılmaz', email: 'ahmet@trakya.edu.tr', phone: '05551112233', schoolId: 'S001' },
+    { id: 'T002', title: 'Doç. Dr.', firstName: 'Ayşe', lastName: 'Kaya', email: 'ayse@trakya.edu.tr', phone: '05552223344', schoolId: 'S001' },
 ];
 
 const allCoursesData: Course[] = [
-    { id: 'C001', name: 'Programlamaya Giriş', code: 'BM101', departmentId: 'D001', teacherId: 'T001' },
-    { id: 'C002', name: 'Veri Yapıları', code: 'BM201', departmentId: 'D001', teacherId: 'T002' },
-    { id: 'C003', name: 'Termodinamik', code: 'MM205', departmentId: 'D002', teacherId: 'T001' },
-    { id: 'C004', name: 'İktisada Giriş', code: 'ISL101', departmentId: 'D003', teacherId: 'T003' },
+    { id: 'C001', name: 'İŞ ETİĞİ', code: 'YON701', departmentId: 'D001', teacherId: 'T001' },
+    { id: 'C002', name: 'YÖNETİMDE ÇAĞDAŞ YAKLAŞIMLAR', code: 'YON705', departmentId: 'D001', teacherId: 'T002' },
+    { id: 'C003', name: 'ÖRGÜT KÜLTÜRÜ', code: 'YON707', departmentId: 'D001', teacherId: 'T001' },
+    { id: 'C004', name: 'ÖRGÜTLERDE İNSAN DAVRANIŞI', code: 'YON709', departmentId: 'D001', teacherId: 'T002' },
+    { id: 'C005', name: 'STRATEJİK YÖNETİM', code: 'YON711', departmentId: 'D001', teacherId: 'T001' },
 ];
 
 const initialExamsData: Exam[] = [
-    { id: 'E001', name: '2024 Güz Dönemi Vize Sınavları', description: 'Tüm bölümlerin vize sınavları.', closingDate: '2024-11-10', isActive: true },
-    { id: 'E002', name: '2024 Güz Dönemi Final Sınavları', description: 'Tüm bölümlerin final sınavları.', closingDate: '2025-01-15', isActive: false },
+    { id: 'E001', name: '2025-2026 GÜZ DÖNEMİ ARA SINAVI', description: 'SOSYAL BİLİMLER ENSTİTÜSÜ', closingDate: '2025-11-10', isActive: true },
+    { id: 'E002', name: 'UZAKTAN EĞİTİM TEZSİZ YÜKSEK LİSANS FİNAL SINAVLARI', description: 'DÖNEM SONU', closingDate: '2026-01-15', isActive: false },
 ];
 
 const allSessionsData: Session[] = [
-    { id: 'SS001', sequenceNumber: 1, name: '1. Oturum - Sabah', date: '2024-11-20T09:00', examId: 'E001', isActive: true },
-    { id: 'SS002', sequenceNumber: 2, name: '2. Oturum - Öğleden Sonra', date: '2024-11-20T14:00', examId: 'E001', isActive: true },
-    { id: 'SS003', sequenceNumber: 1, name: 'Final 1. Oturum', date: '2025-01-20T10:00', examId: 'E002', isActive: false },
+    { id: 'SS001', sequenceNumber: 1, name: '1. Oturum', date: '2025-11-15T10:00', examId: 'E001', isActive: true },
+    { id: 'SS002', sequenceNumber: 2, name: '2. Oturum', date: '2025-11-15T11:30', examId: 'E001', isActive: true },
+    { id: 'SS003', sequenceNumber: 3, name: '3. Oturum', date: '2025-11-15T14:00', examId: 'E001', isActive: true },
+    { id: 'SS004', sequenceNumber: 4, name: '4. Oturum', date: '2025-11-15T15:30', examId: 'E001', isActive: true },
 ];
 
-const initialSessionCoursesData: SessionCourse[] = [];
+const initialAttendantsData: Attendant[] = [
+    { id: 'A001', title: 'Doç. Dr.', firstName: 'Ali İhsan', lastName: 'MEŞE', schoolId: 'S001', email: 'ali.mese@trakya.edu.tr', phone: '', isActive: true },
+    { id: 'A002', title: 'Öğr. Gör.', firstName: 'Can', lastName: 'TEZCAN', schoolId: 'S001', email: 'can.tezcan@trakya.edu.tr', phone: '', isActive: true },
+    { id: 'A003', title: 'Dr. Öğr. Üyesi', firstName: 'Levent', lastName: 'DOĞAN', schoolId: 'S001', email: 'levent.dogan@trakya.edu.tr', phone: '', isActive: true },
+    { id: 'A004', title: 'Dr. Öğr. Üyesi', firstName: 'Müge', lastName: 'ATAKAN', schoolId: 'S001', email: 'muge.atakan@trakya.edu.tr', phone: '', isActive: true },
+    { id: 'A005', title: 'Enstitü Sekr.', firstName: 'Cihan', lastName: 'SAYAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A006', title: 'Bilg. İşl.', firstName: 'Özlem', lastName: 'GÜÇKAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A007', title: 'Bilg. İşl.', firstName: 'Cem', lastName: 'KAVALCI', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A008', title: 'Dr. Öğr. Üyesi', firstName: 'Tolga', lastName: 'DİLLİOĞLU', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A009', title: 'Bilg. İşl.', firstName: 'Mehmet', lastName: 'GÜNGÖR', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A010', title: 'Bilg. İşl.', firstName: 'Hilal', lastName: 'ÖZTÜRK', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A011', title: 'Arş. Gör. Dr.', firstName: 'Engin', lastName: 'ÇİÇEK', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A012', title: 'Bilg. İşl.', firstName: 'İlknur', lastName: 'HAKAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A013', title: 'Bilg. İşl.', firstName: 'Eren', lastName: 'MAZLUM', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A014', title: 'Şef', firstName: 'Cengiz', lastName: 'ERDUVAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A015', title: 'Bilg. İşl.', firstName: 'Arzu Atabey', lastName: 'KILIÇ', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A016', title: 'Bilg. İşl.', firstName: 'Mehmet', lastName: 'AKTAŞ', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A017', title: 'Veri Haz. Kont. İşl.', firstName: 'Murat', lastName: 'SOYASLAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A018', title: 'Bilg. İşl.', firstName: 'Serkan', lastName: 'MEYDAN', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A019', title: '', firstName: 'Şükrü', lastName: 'GÜLER', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A020', title: '', firstName: 'Arif Kaan', lastName: 'AVCU', schoolId: 'S001', email: '', phone: '', isActive: true },
+    { id: 'A021', title: '', firstName: 'İhsan', lastName: 'KARA', schoolId: 'S001', email: '', phone: '', isActive: true },
+];
 
+const initialStudentsData: Student[] = [
+    { id: 'ST-2582634027', studentNumber: '2582634027', firstName: 'HİLAL', lastName: 'AKGÜN KOKALA' }
+];
+
+// Empty initial associations, but users can link them easily now that base data is there
+const initialSessionCoursesData: SessionCourse[] = [];
 const initialExamCoursesData: ExamCourse[] = [];
 const initialExamHallsData: ExamHall[] = [];
 const initialSessionDepartmentsData: SessionDepartment[] = [];
@@ -129,26 +190,32 @@ const Header: React.FC = () => {
 
 const App: React.FC = () => {
   const [activePage, setActivePage] = useState<PageState>({ page: 'dashboard' });
-  const [schools, setSchools] = useState<School[]>(initialSchoolsData);
-  const [departments, setDepartments] = useState<Department[]>(allDepartmentsData);
-  const [buildings, setBuildings] = useState<Building[]>(initialBuildingsData);
-  const [halls, setHalls] = useState<Hall[]>(allHallsData);
-  const [courses, setCourses] = useState<Course[]>(allCoursesData);
-  const [exams, setExams] = useState<Exam[]>(initialExamsData);
-  const [sessions, setSessions] = useState<Session[]>(allSessionsData);
-  const [sessionCourses, setSessionCourses] = useState<SessionCourse[]>(initialSessionCoursesData);
-  const [sessionDepartments, setSessionDepartments] = useState<SessionDepartment[]>(initialSessionDepartmentsData);
-  const [examCourses, setExamCourses] = useState<ExamCourse[]>(initialExamCoursesData);
-  const [examHalls, setExamHalls] = useState<ExamHall[]>(initialExamHallsData);
-  const [sessionHalls, setSessionHalls] = useState<SessionHall[]>(initialSessionHallsData);
   
-  // Student, Teacher and Registration State
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>(initialTeachersData);
-  const [studentCourseRegistrations, setStudentCourseRegistrations] = useState<StudentCourseRegistration[]>([]);
+  // Persistent State using localStorage - KEY NAMES UPDATED TO _v1 TO LOAD NEW MOCK DATA
+  const [schools, setSchools] = usePersistedState<School[]>('ems_schools_v1', initialSchoolsData);
+  const [departments, setDepartments] = usePersistedState<Department[]>('ems_departments_v1', allDepartmentsData);
+  const [buildings, setBuildings] = usePersistedState<Building[]>('ems_buildings_v1', initialBuildingsData);
+  const [halls, setHalls] = usePersistedState<Hall[]>('ems_halls_v1', allHallsData);
+  const [courses, setCourses] = usePersistedState<Course[]>('ems_courses_v1', allCoursesData);
+  const [exams, setExams] = usePersistedState<Exam[]>('ems_exams_v1', initialExamsData);
+  const [sessions, setSessions] = usePersistedState<Session[]>('ems_sessions_v1', allSessionsData);
+  const [sessionCourses, setSessionCourses] = usePersistedState<SessionCourse[]>('ems_sessionCourses_v1', initialSessionCoursesData);
+  const [sessionDepartments, setSessionDepartments] = usePersistedState<SessionDepartment[]>('ems_sessionDepartments_v1', initialSessionDepartmentsData);
+  const [examCourses, setExamCourses] = usePersistedState<ExamCourse[]>('ems_examCourses_v1', initialExamCoursesData);
+  const [examHalls, setExamHalls] = usePersistedState<ExamHall[]>('ems_examHalls_v1', initialExamHallsData);
+  const [sessionHalls, setSessionHalls] = usePersistedState<SessionHall[]>('ems_sessionHalls_v1', initialSessionHallsData);
   
-  // Student Hall Assignments
-  const [studentHallAssignments, setStudentHallAssignments] = useState<StudentHallAssignment[]>([]);
+  // Student, Teacher, Attendant and Registration State
+  const [students, setStudents] = usePersistedState<Student[]>('ems_students_v1', initialStudentsData);
+  const [teachers, setTeachers] = usePersistedState<Teacher[]>('ems_teachers_v1', initialTeachersData);
+  const [attendants, setAttendants] = usePersistedState<Attendant[]>('ems_attendants_v1', initialAttendantsData);
+  const [studentCourseRegistrations, setStudentCourseRegistrations] = usePersistedState<StudentCourseRegistration[]>('ems_studentCourseRegistrations_v1', []);
+  
+  // Assignments
+  const [studentHallAssignments, setStudentHallAssignments] = usePersistedState<StudentHallAssignment[]>('ems_studentHallAssignments_v1', []);
+  const [attendantAssignments, setAttendantAssignments] = usePersistedState<AttendantAssignment[]>('ems_attendantAssignments_v1', []);
+  const [taskRequests, setTaskRequests] = usePersistedState<TaskRequest[]>('ems_taskRequests_v1', []);
+
 
   const handleNavigate = (pageState: PageState) => {
     setActivePage(pageState);
@@ -350,10 +417,8 @@ const App: React.FC = () => {
         });
     };
 
-    // Explicit handler to clear/reset assignments
     const handleResetStudentHallAssignments = (sessionId: string, departmentId: string) => {
         setStudentHallAssignments(prev => {
-            // Only return assignments that DO NOT match the sessionId and departmentId
             return prev.filter(a => !(a.sessionId === sessionId && a.departmentId === departmentId));
         });
     };
@@ -411,6 +476,77 @@ const App: React.FC = () => {
     };
     const handleDeleteTeacher = (teacherId: string) => {
         setTeachers(teachers.filter(t => t.id !== teacherId));
+    };
+
+    // --- Attendant CRUD Handlers ---
+    const handleAddAttendant = (attendantData: Omit<Attendant, 'id' | 'isActive'>) => {
+        const newAttendant: Attendant = { id: `A${Date.now()}`, ...attendantData, isActive: true };
+        setAttendants([newAttendant, ...attendants]);
+    };
+    const handleUpdateAttendant = (updatedAttendant: Attendant) => {
+        setAttendants(attendants.map(a => a.id === updatedAttendant.id ? updatedAttendant : a));
+    };
+    const handleDeleteAttendant = (attendantId: string) => {
+        setAttendants(attendants.filter(a => a.id !== attendantId));
+    };
+    const handleToggleAttendantStatus = (attendantId: string) => {
+        setAttendants(attendants.map(a => a.id === attendantId ? { ...a, isActive: !a.isActive } : a));
+    };
+
+    // --- Attendant Assignment Handlers ---
+    const handleUpdateAttendantAssignment = (
+        sessionId: string,
+        buildingId: string,
+        roleName: string,
+        attendantId: string,
+        hallId?: string
+    ) => {
+        setAttendantAssignments(prev => {
+            const filtered = prev.filter(a => {
+                const isSameSession = a.sessionId === sessionId;
+                const isSameBuilding = a.buildingId === buildingId;
+                const isSameRole = a.roleName === roleName;
+                const isSameHall = a.hallId === hallId;
+                
+                return !(isSameSession && isSameBuilding && isSameRole && isSameHall);
+            });
+
+            if (attendantId === "") return filtered;
+
+            return [...filtered, {
+                id: `AA-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                sessionId,
+                buildingId,
+                hallId,
+                roleName,
+                attendantId,
+                status: 'ASSIGNED'
+            }];
+        });
+    };
+
+    const handleAssignmentResponse = (assignmentId: string, status: 'ACCEPTED' | 'REJECTED') => {
+        setAttendantAssignments(prev => prev.map(a => 
+            a.id === assignmentId ? { ...a, status } : a
+        ));
+    };
+
+    // --- Task Request Handlers ---
+    const handleRequestTask = (attendantId: string, sessionId: string) => {
+        setTaskRequests(prev => {
+            if (prev.some(r => r.attendantId === attendantId && r.sessionId === sessionId)) return prev;
+            return [...prev, {
+                id: `TR-${Date.now()}`,
+                attendantId,
+                sessionId,
+                status: 'PENDING',
+                requestDate: new Date().toISOString()
+            }];
+        });
+    };
+
+    const handleCancelTaskRequest = (attendantId: string, sessionId: string) => {
+        setTaskRequests(prev => prev.filter(r => !(r.attendantId === attendantId && r.sessionId === sessionId)));
     };
 
 
@@ -474,6 +610,77 @@ const App: React.FC = () => {
                     onDelete={handleDeleteTeacher}
                     onNavigate={handleNavigate}
                />;
+      case 'attendants':
+        return <AttendantsPage
+                    attendants={attendants}
+                    schools={schools}
+                    onAdd={handleAddAttendant}
+                    onUpdate={handleUpdateAttendant}
+                    onDelete={handleDeleteAttendant}
+                    onToggleStatus={handleToggleAttendantStatus}
+               />;
+      case 'attendant-assignments':
+        return <AttendantAssignmentsPage
+                    exams={exams}
+                    sessions={sessions}
+                    halls={halls}
+                    buildings={buildings}
+                    sessionHalls={sessionHalls}
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    taskRequests={taskRequests}
+                    onUpdateAssignment={handleUpdateAttendantAssignment}
+               />;
+      case 'signature-lists':
+          return <SignatureListsPage
+                    exams={exams}
+                    sessions={sessions}
+                    buildings={buildings}
+                    halls={halls}
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    sessionHalls={sessionHalls}
+                    departments={departments}
+                    schools={schools}
+                />;
+      case 'hall-lists':
+          return <HallListsPage
+                    exams={exams}
+                    sessions={sessions}
+                    buildings={buildings}
+                    halls={halls}
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    sessionHalls={sessionHalls}
+                />;
+      case 'task-request':
+          return <TaskRequestPage
+                    exams={exams}
+                    sessions={sessions}
+                    attendants={attendants}
+                    taskRequests={taskRequests}
+                    onRequestTask={handleRequestTask}
+                    onCancelRequest={handleCancelTaskRequest}
+                />;
+      case 'task-accept':
+          return <TaskAcceptPage 
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    exams={exams}
+                    sessions={sessions}
+                    buildings={buildings}
+                    halls={halls}
+                    onRespond={handleAssignmentResponse}
+                />;
+      case 'task-archive':
+          return <TaskArchivePage 
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    exams={exams}
+                    sessions={sessions}
+                    buildings={buildings}
+                    halls={halls}
+                />;
       case 'exams':
         return <ExamsPage
                     exams={exams}

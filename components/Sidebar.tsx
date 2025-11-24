@@ -18,30 +18,15 @@ import {
   UserGroupIcon,
   ClipboardListIcon,
   IdentificationIcon,
-  SearchCircleIcon
+  SearchCircleIcon,
+  BriefcaseIcon,
+  ClipboardCheckIcon,
+  DocumentTextIcon,
+  DocumentDuplicateIcon,
+  HandRaiseIcon,
+  CheckBadgeIcon,
+  ArchiveBoxIcon
 } from './icons';
-
-const navItemsYonetim: NavItemType[] = [
-  { id: 'dashboard', name: 'Ana Sayfa', icon: DashboardIcon, path: '#' },
-  { id: 'schools', name: 'Okullar', icon: SchoolIcon, path: '#' },
-  { id: 'departments', name: 'Bölümler', icon: DepartmentIcon, path: '#' },
-  { id: 'buildings', name: 'Binalar', icon: BuildingIcon, path: '#' },
-  { id: 'halls', name: 'Salonlar', icon: HallIcon, path: '#' },
-  { id: 'courses', name: 'Dersler', icon: CourseIcon, path: '#' },
-  { id: 'teachers', name: 'Öğretmenler', icon: UsersIcon, path: '#' },
-];
-
-const navItemsSinav: NavItemType[] = [
-  { id: 'exams', name: 'Sınavlar', icon: ExamIcon, path: '#' },
-  { id: 'sessions', name: 'Sınav-Oturum', icon: ClockIcon, path: '#' },
-  { id: 'exam-courses', name: 'Sınav-Ders', icon: BookOpenIcon, path: '#' },
-  { id: 'exam-halls', name: 'Sınav-Salon', icon: HallIcon, path: '#' },
-  { id: 'student-registrations', name: 'Ders-Öğrenci', icon: UserGroupIcon, path: '#' },
-  { id: 'session-courses', name: 'Oturum-Ders', icon: ClipboardListIcon, path: '#' },
-  { id: 'session-halls', name: 'Oturum-Salon', icon: HallIcon, path: '#' },
-  { id: 'session-students', name: 'Oturum-Öğrenci', icon: IdentificationIcon, path: '#' },
-  { id: 'session-inquiry', name: 'Oturum Sorgu', icon: SearchCircleIcon, path: '#' },
-];
 
 interface NavItemProps {
   item: NavItemType;
@@ -92,8 +77,58 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
+    // State to track which sections are open. Defaulting all to true for initial visibility.
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        management: true,
+        exam_ops: true,
+        attendant_ops: true,
+        task_ops: true,
+    });
+
+    const toggleSection = (sectionId: string) => {
+        setOpenSections(prev => ({
+            ...prev,
+            [sectionId]: !prev[sectionId]
+        }));
+    };
+
+    const navItemsYonetim: NavItemType[] = [
+        { id: 'dashboard', name: 'Ana Sayfa', icon: DashboardIcon, path: '#' },
+        { id: 'schools', name: 'Okullar', icon: SchoolIcon, path: '#' },
+        { id: 'departments', name: 'Bölümler', icon: DepartmentIcon, path: '#' },
+        { id: 'buildings', name: 'Binalar', icon: BuildingIcon, path: '#' },
+        { id: 'halls', name: 'Salonlar', icon: HallIcon, path: '#' },
+        { id: 'courses', name: 'Dersler', icon: CourseIcon, path: '#' },
+        { id: 'teachers', name: 'Öğretmenler', icon: UsersIcon, path: '#' },
+    ];
+
+    const navItemsSinav: NavItemType[] = [
+        { id: 'exams', name: 'Sınavlar', icon: ExamIcon, path: '#' },
+        { id: 'sessions', name: 'Sınav-Oturum', icon: ClockIcon, path: '#' },
+        { id: 'exam-courses', name: 'Sınav-Ders', icon: BookOpenIcon, path: '#' },
+        { id: 'exam-halls', name: 'Sınav-Salon', icon: HallIcon, path: '#' },
+        { id: 'student-registrations', name: 'Ders-Öğrenci', icon: UserGroupIcon, path: '#' },
+        { id: 'session-courses', name: 'Oturum-Ders', icon: ClipboardListIcon, path: '#' },
+        { id: 'session-halls', name: 'Oturum-Salon', icon: HallIcon, path: '#' },
+        { id: 'session-students', name: 'Oturum-Öğrenci', icon: IdentificationIcon, path: '#' },
+        { id: 'session-inquiry', name: 'Oturum Sorgu', icon: SearchCircleIcon, path: '#' },
+    ];
+
+    const navItemsGorevli: NavItemType[] = [
+        { id: 'attendants', name: 'Görevliler', icon: BriefcaseIcon, path: '#' },
+        { id: 'attendant-assignments', name: 'Görevli Tanımla', icon: ClipboardCheckIcon, path: '#' },
+        { id: 'signature-lists', name: 'İmza Listeleri', icon: DocumentTextIcon, path: '#' },
+        { id: 'hall-lists', name: 'Salon Listeleri', icon: DocumentDuplicateIcon, path: '#' },
+    ];
+
+    const navItemsGorev: NavItemType[] = [
+        { id: 'task-request', name: 'Görev İste', icon: HandRaiseIcon, path: '#' },
+        { id: 'task-accept', name: 'Görev Kabul', icon: CheckBadgeIcon, path: '#' },
+        { id: 'task-archive', name: 'Arşiv', icon: ArchiveBoxIcon, path: '#' },
+    ];
+
   return (
-    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0 print:hidden">
+    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0 print:hidden overflow-hidden">
       <div className="flex items-center justify-between p-4 mb-2 shrink-0">
         <div className="flex items-center">
           <SchoolIcon className="h-8 w-8 text-orange-400" />
@@ -102,29 +137,98 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-        <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-3 mt-2">Yönetim</h3>
-        <ul className="space-y-2">
-          {navItemsYonetim.map((item) => (
-            <NavItem 
-              key={item.id} 
-              item={item} 
-              isActive={activePage === item.id}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </ul>
+        
+        {/* YÖNETİM Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('management')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-2 hover:text-white focus:outline-none"
+            >
+                <span>YÖNETİM</span>
+                {openSections['management'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['management'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsYonetim.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={onNavigate}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
 
-        <h3 className="text-xs text-gray-400 uppercase tracking-wider mt-8 mb-3">Sınav İşlemleri</h3>
-        <ul className="space-y-2">
-          {navItemsSinav.map((item) => (
-            <NavItem 
-              key={item.id} 
-              item={item} 
-              isActive={activePage === item.id}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </ul>
+        {/* SINAV İŞLEMLERİ Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('exam_ops')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-4 hover:text-white focus:outline-none"
+            >
+                <span>SINAV İŞLEMLERİ</span>
+                {openSections['exam_ops'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['exam_ops'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsSinav.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={onNavigate}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
+
+        {/* GÖREVLİ İŞLEMLERİ Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('attendant_ops')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-4 hover:text-white focus:outline-none"
+            >
+                <span>GÖREVLİ İŞLEMLERİ</span>
+                {openSections['attendant_ops'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['attendant_ops'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsGorevli.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={onNavigate}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
+
+        {/* GÖREV İŞLEMLERİ Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('task_ops')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-4 hover:text-white focus:outline-none"
+            >
+                <span>GÖREV İŞLEMLERİ</span>
+                {openSections['task_ops'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['task_ops'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsGorev.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={onNavigate}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
         
         <div className="mt-8 border-t border-gray-700 pt-4">
              <ul className="space-y-2">
