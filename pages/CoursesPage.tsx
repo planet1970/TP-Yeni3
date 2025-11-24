@@ -7,7 +7,7 @@ interface CoursesPageProps {
     allSchools: School[];
     allDepartments: Department[];
     allCourses: Course[];
-    teachers: Teacher[]; // Passed from App
+    teachers: Teacher[];
     onAdd: (course: Omit<Course, 'id'>) => void;
     onUpdate: (course: Course) => void;
     onDelete: (courseId: string) => void;
@@ -16,7 +16,7 @@ interface CoursesPageProps {
 
 const CourseForm: React.FC<{
     course: Partial<Course> | null;
-    teachers: Teacher[]; // Filtered teachers list
+    teachers: Teacher[];
     onSave: (course: Omit<Course, 'id' | 'departmentId'> & { id?: string }) => void;
     onCancel: () => void;
 }> = ({ course, teachers, onSave, onCancel }) => {

@@ -17,7 +17,8 @@ import {
   BookOpenIcon,
   UserGroupIcon,
   ClipboardListIcon,
-  IdentificationIcon
+  IdentificationIcon,
+  SearchCircleIcon
 } from './icons';
 
 const navItemsYonetim: NavItemType[] = [
@@ -39,6 +40,7 @@ const navItemsSinav: NavItemType[] = [
   { id: 'session-courses', name: 'Oturum-Ders', icon: ClipboardListIcon, path: '#' },
   { id: 'session-halls', name: 'Oturum-Salon', icon: HallIcon, path: '#' },
   { id: 'session-students', name: 'Oturum-Öğrenci', icon: IdentificationIcon, path: '#' },
+  { id: 'session-inquiry', name: 'Oturum Sorgu', icon: SearchCircleIcon, path: '#' },
 ];
 
 interface NavItemProps {
@@ -91,7 +93,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
   return (
-    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0">
+    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0 print:hidden">
       <div className="flex items-center justify-between p-4 mb-2 shrink-0">
         <div className="flex items-center">
           <SchoolIcon className="h-8 w-8 text-orange-400" />

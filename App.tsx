@@ -16,6 +16,7 @@ import SessionCoursesPage from './pages/SessionCoursesPage';
 import SessionHallsPage from './pages/SessionHallsPage';
 import SessionStudentsPage from './pages/SessionStudentsPage';
 import TeachersPage from './pages/TeachersPage';
+import SessionInquiryPage from './pages/SessionInquiryPage';
 import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, StudentCourseRegistration, StudentHallAssignment } from './types';
 import { 
   BellIcon, 
@@ -41,6 +42,7 @@ const initialTeachersData: Teacher[] = [
     { id: 'T001', title: 'Prof. Dr.', firstName: 'Ahmet', lastName: 'Yılmaz', email: 'ahmet.yilmaz@example.edu.tr', phone: '05551112233', schoolId: 'S001' },
     { id: 'T002', title: 'Doç. Dr.', firstName: 'Ayşe', lastName: 'Demir', email: 'ayse.demir@example.edu.tr', phone: '05554445566', schoolId: 'S001' },
     { id: 'T003', title: 'Dr. Öğr. Üyesi', firstName: 'Mehmet', lastName: 'Kaya', email: 'mehmet.kaya@example.edu.tr', phone: '05557778899', schoolId: 'S002' },
+    { id: 'T004', title: 'Prof. Dr.', firstName: 'Canan', lastName: 'Işık', email: 'canan.isik@example.edu.tr', phone: '05559990011', schoolId: 'S003' },
 ];
 
 const allDepartmentsData: Department[] = [
@@ -89,7 +91,7 @@ const initialSessionHallsData: SessionHall[] = [];
 
 const Header: React.FC = () => {
   return (
-    <header className="bg-white p-4 flex justify-between items-center shadow-sm">
+    <header className="bg-white p-4 flex justify-between items-center shadow-sm print:hidden">
       <h1 className="text-xl font-bold text-gray-700">WELCOME!</h1>
       <div className="flex items-center space-x-4">
         <div className="relative">
@@ -154,7 +156,7 @@ const App: React.FC = () => {
 
   // --- School CRUD Handlers ---
   const handleAddSchool = (schoolData: Omit<School, 'id'>) => {
-    const newSchool: School = { id: `S${Date.now()}`, ...schoolData };
+    const newSchool: School = { id: `S00${Date.now()}`, ...schoolData };
     setSchools([newSchool, ...schools]);
   };
   const handleUpdateSchool = (updatedSchool: School) => {
@@ -340,15 +342,19 @@ const App: React.FC = () => {
     };
     
     // --- Student Hall Assignments Handlers ---
-    const handleSaveStudentHallAssignments = (newAssignments: StudentHallAssignment[]) => {
-        if (newAssignments.length === 0) return;
-
-        const { sessionId, departmentId } = newAssignments[0];
-        
+    const handleSaveStudentHallAssignments = (sessionId: string, departmentId: string, newAssignments: StudentHallAssignment[]) => {
         setStudentHallAssignments(prev => {
             // Remove old assignments for this specific session and department
             const filtered = prev.filter(a => !(a.sessionId === sessionId && a.departmentId === departmentId));
             return [...filtered, ...newAssignments];
+        });
+    };
+
+    // Explicit handler to clear/reset assignments
+    const handleResetStudentHallAssignments = (sessionId: string, departmentId: string) => {
+        setStudentHallAssignments(prev => {
+            // Only return assignments that DO NOT match the sessionId and departmentId
+            return prev.filter(a => !(a.sessionId === sessionId && a.departmentId === departmentId));
         });
     };
 
@@ -453,7 +459,7 @@ const App: React.FC = () => {
                     allSchools={schools}
                     allDepartments={departments}
                     allCourses={courses}
-                    teachers={teachers} // Passed teachers
+                    teachers={teachers}
                     onAdd={handleAddCourse}
                     onUpdate={handleUpdateCourse}
                     onDelete={handleDeleteCourse}
@@ -462,7 +468,7 @@ const App: React.FC = () => {
       case 'teachers':
         return <TeachersPage
                     teachers={teachers}
-                    schools={schools} // Passed schools
+                    schools={schools}
                     onAdd={handleAddTeacher}
                     onUpdate={handleUpdateTeacher}
                     onDelete={handleDeleteTeacher}
@@ -564,6 +570,21 @@ const App: React.FC = () => {
                     studentCourseRegistrations={studentCourseRegistrations}
                     studentHallAssignments={studentHallAssignments}
                     onSaveAssignments={handleSaveStudentHallAssignments}
+                    onResetAssignments={handleResetStudentHallAssignments}
+                />;
+      case 'session-inquiry':
+          return <SessionInquiryPage
+                    students={students}
+                    exams={exams}
+                    sessions={sessions}
+                    halls={halls}
+                    courses={courses}
+                    departments={departments}
+                    studentHallAssignments={studentHallAssignments}
+                    sessionCourses={sessionCourses}
+                    studentCourseRegistrations={studentCourseRegistrations}
+                    buildings={buildings}
+                    schools={schools}
                 />;
       default:
         return <DashboardPage />;
@@ -575,7 +596,7 @@ const App: React.FC = () => {
       <Sidebar activePage={activePage.page} onNavigate={handleNavigate} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6 print:p-0 print:bg-white print:overflow-visible">
           {renderContent()}
         </main>
       </div>

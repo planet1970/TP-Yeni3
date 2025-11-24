@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { IdentificationIcon, ChevronDownIcon, ChevronRightIcon } from '../components/icons';
+import { IdentificationIcon, ChevronDownIcon, ChevronRightIcon, TrashIcon } from '../components/icons';
 import type { Exam, Session, Department, Hall, Student, SessionDepartment, SessionHall, SessionCourse, Course, StudentHallAssignment, StudentCourseRegistration } from '../types';
 
 interface SessionStudentsPageProps {
@@ -15,8 +15,48 @@ interface SessionStudentsPageProps {
     sessionCourses: SessionCourse[];
     studentCourseRegistrations: StudentCourseRegistration[];
     studentHallAssignments: StudentHallAssignment[];
-    onSaveAssignments: (assignments: StudentHallAssignment[]) => void;
+    onSaveAssignments: (sessionId: string, departmentId: string, assignments: StudentHallAssignment[]) => void;
+    onResetAssignments: (sessionId: string, departmentId: string) => void;
 }
+
+// Separate component for the Reset Button to handle its own confirmation state
+const ResetButton: React.FC<{
+    onConfirm: () => void;
+}> = ({ onConfirm }) => {
+    const [isConfirming, setIsConfirming] = useState(false);
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent row clicks or other propagations
+        if (isConfirming) {
+            onConfirm();
+            setIsConfirming(false);
+        } else {
+            setIsConfirming(true);
+            // Auto-reset confirmation state after 3 seconds if not clicked
+            setTimeout(() => setIsConfirming(false), 3000);
+        }
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={handleClick}
+            className={`p-2 rounded-lg transition-all duration-200 flex items-center shadow-sm border ${
+                isConfirming 
+                ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' 
+                : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+            }`}
+            title={isConfirming ? "İşlemi Onaylayın" : "Dağıtımı Sıfırla"}
+        >
+            {isConfirming ? (
+                <span className="text-xs font-bold mr-1">Emin misin?</span>
+            ) : (
+                <span className="mr-1 text-xs font-semibold">Sıfırla</span>
+            )}
+            <TrashIcon className={`h-4 w-4 ${isConfirming ? 'text-white' : ''}`} />
+        </button>
+    );
+};
 
 const PlacementModal: React.FC<{
     session: Session;
@@ -95,10 +135,14 @@ const PlacementModal: React.FC<{
     const handlePlaceStudents = () => {
         if (!isValidTotal) return;
 
-        // Fisher-Yates Shuffle
+        // Fisher-Yates Shuffle Algorithm for guaranteed randomization
+        // Create a shallow copy first
         const shuffled = [...studentsList];
+        
         for (let i = shuffled.length - 1; i > 0; i--) {
+            // Pick a remaining element
             const j = Math.floor(Math.random() * (i + 1));
+            // Swap it with the current element
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
 
@@ -113,16 +157,6 @@ const PlacementModal: React.FC<{
 
         setPlacements(newPlacements);
         setIsPlaced(true);
-    };
-
-    const handleReset = () => {
-        if (window.confirm("Yerleşimi sıfırlamak üzeresiniz. Mevcut atamalar temizlenecek ve salon öğrenci sayıları varsayılan kapasite oranlarına dönecektir. Onaylıyor musunuz?")) {
-            // Reset assignments completely
-            setDistributions(calculateProportionalDistribution());
-            setPlacements({});
-            setIsPlaced(false);
-            setExpandedHallId(null);
-        }
     };
 
     const handleSave = () => {
@@ -195,7 +229,7 @@ const PlacementModal: React.FC<{
                                         <input
                                             type="number"
                                             min="0"
-                                            disabled={isPlaced} // Disable edit if placed, force Reset first
+                                            disabled={isPlaced}
                                             value={distributions[hall.id] || 0}
                                             onChange={(e) => handleDistributionChange(hall.id, e.target.value)}
                                             className={`w-20 px-2 py-1 border rounded text-center focus:ring-orange-500 focus:border-orange-500 ${isPlaced ? 'bg-gray-100' : ''}`}
@@ -238,15 +272,6 @@ const PlacementModal: React.FC<{
                         İptal
                     </button>
                     
-                    {isPlaced && (
-                         <button 
-                            onClick={handleReset}
-                            className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
-                        >
-                            Sıfırla
-                        </button>
-                    )}
-
                     {!isPlaced && (
                         <button 
                             onClick={handlePlaceStudents}
@@ -255,11 +280,11 @@ const PlacementModal: React.FC<{
                                 isValidTotal ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                         >
-                            Yerleştir
+                            Yerleştir (Karıştır)
                         </button>
                     )}
                     
-                    {isPlaced && (
+                    {(isPlaced || existingAssignments.length > 0) && (
                          <button 
                             onClick={handleSave}
                             className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium"
@@ -285,7 +310,8 @@ const SessionStudentsPage: React.FC<SessionStudentsPageProps> = ({
     sessionCourses,
     studentCourseRegistrations,
     studentHallAssignments,
-    onSaveAssignments
+    onSaveAssignments,
+    onResetAssignments
 }) => {
     const [selectedExamId, setSelectedExamId] = useState<string>('');
     
@@ -456,29 +482,37 @@ const SessionStudentsPage: React.FC<SessionStudentsPageProps> = ({
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <button 
-                                                        onClick={() => setModalConfig({ 
-                                                            session: row.session, 
-                                                            department: row.department,
-                                                            studentCount: row.studentCount,
-                                                            studentsList: row.studentsList,
-                                                            assignedHalls: row.assignedHalls
-                                                        })}
-                                                        disabled={!isCapacityEnough || row.assignedHalls.length === 0}
-                                                        className={`p-2 rounded-lg transition-colors flex items-center ml-auto shadow-sm ${
-                                                            row.isPlaced 
-                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                            : (!isCapacityEnough || row.assignedHalls.length === 0) 
-                                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                : 'bg-orange-500 text-white hover:bg-orange-600'
-                                                        }`}
-                                                        title={row.isPlaced ? "Düzenle / Görüntüle" : "Öğrencileri Yerleştir"}
-                                                    >
-                                                        <span className="mr-2 text-xs font-semibold">
-                                                            {row.isPlaced ? 'Yerleştirildi' : 'Yerleştir'}
-                                                        </span>
-                                                        <IdentificationIcon className="h-5 w-5" />
-                                                    </button>
+                                                    <div className="flex items-center justify-end space-x-2">
+                                                        {row.isPlaced && (
+                                                            <ResetButton 
+                                                                onConfirm={() => onResetAssignments(row.session.id, row.department.id)} 
+                                                            />
+                                                        )}
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setModalConfig({ 
+                                                                session: row.session, 
+                                                                department: row.department,
+                                                                studentCount: row.studentCount,
+                                                                studentsList: row.studentsList,
+                                                                assignedHalls: row.assignedHalls
+                                                            })}
+                                                            disabled={!isCapacityEnough || row.assignedHalls.length === 0}
+                                                            className={`p-2 rounded-lg transition-colors flex items-center shadow-sm ${
+                                                                row.isPlaced 
+                                                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                : (!isCapacityEnough || row.assignedHalls.length === 0) 
+                                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                                                            }`}
+                                                            title={row.isPlaced ? "Düzenle / Görüntüle" : "Öğrencileri Yerleştir"}
+                                                        >
+                                                            <span className="mr-2 text-xs font-semibold">
+                                                                {row.isPlaced ? 'Yerleştirildi' : 'Yerleştir'}
+                                                            </span>
+                                                            <IdentificationIcon className="h-5 w-5" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -508,7 +542,7 @@ const SessionStudentsPage: React.FC<SessionStudentsPageProps> = ({
                                 a.sessionId === modalConfig.session.id && 
                                 a.departmentId === modalConfig.department.id
                             )}
-                            onSave={onSaveAssignments}
+                            onSave={(assignments) => onSaveAssignments(modalConfig.session.id, modalConfig.department.id, assignments)}
                             onClose={() => setModalConfig(null)}
                         />
                     )}

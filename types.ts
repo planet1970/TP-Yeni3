@@ -63,7 +63,7 @@ export interface Course {
     name: string;
     code: string;
     departmentId: string;
-    teacherId?: string; // Added teacherId
+    teacherId?: string;
 }
 
 export interface Exam {
@@ -130,7 +130,7 @@ export interface Teacher {
     lastName: string;
     email: string;
     phone: string;
-    schoolId: string; // Added schoolId
+    schoolId: string;
 }
 
 export interface StudentCourseRegistration {

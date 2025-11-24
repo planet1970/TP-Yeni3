@@ -5,7 +5,7 @@ import type { Teacher, School } from '../types';
 
 interface TeachersPageProps {
     teachers: Teacher[];
-    schools: School[]; // Passed from App
+    schools: School[];
     onAdd: (teacher: Omit<Teacher, 'id'>) => void;
     onUpdate: (teacher: Teacher) => void;
     onDelete: (teacherId: string) => void;
