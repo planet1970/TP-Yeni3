@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export interface NavItemType {
@@ -48,6 +47,7 @@ export interface Building {
   id: string;
   name: string;
   description: string;
+  contact: string;
 }
 
 export interface Hall {
@@ -101,6 +101,8 @@ export interface ExamCourse {
     courseId: string;
     questionCount: number;
     duration: number; // in minutes
+    instructions?: string; // Exam instructions (Yönerge)
+    isConfirmed: boolean; // Admin approval status
 }
 
 export interface ExamHall {
@@ -175,4 +177,21 @@ export interface TaskRequest {
     sessionId: string;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     requestDate: string;
+}
+
+// --- Teacher Module Types ---
+export interface Question {
+    id: string;
+    courseId: string;
+    text: string;
+    options: string[]; // Array of 4 or 5 options
+    correctAnswer: string; // Index of correct option
+    points: number;
+}
+
+export interface ExamCourseQuestion {
+    id: string;
+    examId: string;
+    courseId: string;
+    questionId: string;
 }
