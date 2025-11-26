@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { PencilSquareIcon, BookOpenIcon, StackIcon, TrashIcon, CheckBadgeIcon } from '../components/icons';
-import type { Teacher, Exam, Course, ExamCourse, Question, ExamCourseQuestion } from '../types';
+import { PencilSquareIcon, BookOpenIcon, StackIcon, TrashIcon, CheckBadgeIcon, CurrencyDollarIcon, CheckCircleIcon, PlusIcon, MinusIcon } from '../components/icons';
+import type { Teacher, Exam, Course, ExamCourse, Question, ExamCourseQuestion, Topic } from '../types';
 
 interface TeacherExamDefinitionPageProps {
     teachers: Teacher[];
@@ -8,91 +9,138 @@ interface TeacherExamDefinitionPageProps {
     courses: Course[];
     examCourses: ExamCourse[];
     questions: Question[];
+    topics: Topic[];
     examCourseQuestions: ExamCourseQuestion[];
     onUpdateExamCourse: (examCourse: ExamCourse) => void;
     onAssignQuestions: (examId: string, courseId: string, questionIds: string[]) => void;
     onRemoveQuestionFromExam: (examId: string, courseId: string, questionId: string) => void;
+    onUpdateQuestionPoints: (examId: string, courseId: string, questionId: string, newPoints: number) => void;
+    onRecalculatePoints: (examId: string, courseId: string) => void;
 }
 
 const QuestionSelectionModal: React.FC<{
     course: Course;
     allQuestions: Question[];
+    topics: Topic[];
     assignedQuestionIds: string[];
-    onSave: (selectedIds: string[]) => void;
+    onAddSingle: (questionId: string) => void;
+    onRemoveSingle: (questionId: string) => void;
     onClose: () => void;
-}> = ({ course, allQuestions, assignedQuestionIds, onSave, onClose }) => {
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(assignedQuestionIds));
+}> = ({ course, allQuestions, topics, assignedQuestionIds, onAddSingle, onRemoveSingle, onClose }) => {
+    const [topicFilter, setTopicFilter] = useState('');
 
-    const toggleSelection = (id: string) => {
-        const newSet = new Set(selectedIds);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-        }
-        setSelectedIds(newSet);
+    const filteredQuestions = useMemo(() => {
+        // Filter out invalid questions with missing IDs
+        const validQuestions = allQuestions.filter(q => q.id);
+        if (!topicFilter) return validQuestions;
+        return validQuestions.filter(q => q.topicId === topicFilter);
+    }, [allQuestions, topicFilter]);
+
+    const getTopicName = (topicId?: string) => {
+        const topic = topics.find(t => t.id === topicId);
+        return topic ? topic.name : '-';
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
                     <h3 className="text-xl font-bold text-gray-800">
                         Soru Bankasından Soru Ekle: <span className="text-orange-600">{course.name}</span>
                     </h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <select
+                            value={topicFilter}
+                            onChange={(e) => setTopicFilter(e.target.value)}
+                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-orange-500 flex-1"
+                        >
+                            <option value="">Tüm Konular</option>
+                            {topics.filter(t => t.courseId === course.id).map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                        <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                    </div>
                 </div>
 
                 <div className="p-6 flex-1 overflow-y-auto bg-gray-50">
-                    {allQuestions.length > 0 ? (
+                    {filteredQuestions.length > 0 ? (
                         <div className="space-y-3">
-                            {allQuestions.map((q, idx) => (
-                                <div 
-                                    key={q.id} 
-                                    onClick={() => toggleSelection(q.id)}
-                                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                                        selectedIds.has(q.id) 
-                                        ? 'bg-blue-50 border-blue-500 shadow-md' 
-                                        : 'bg-white border-gray-200 hover:border-orange-300'
-                                    }`}
-                                >
-                                    <div className="flex items-start">
-                                        <div className={`w-5 h-5 mt-1 mr-3 rounded border flex items-center justify-center ${
-                                            selectedIds.has(q.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-400'
-                                        }`}>
-                                            {selectedIds.has(q.id) && <CheckBadgeIcon className="h-4 w-4 text-white" />}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-medium text-gray-800">{q.text}</p>
-                                            <div className="mt-2 text-xs text-gray-500 flex space-x-4">
-                                                <span>Puan: {q.points}</span>
-                                                <span>Seçenek Sayısı: {q.options.length}</span>
+                            {filteredQuestions.map((q, index) => {
+                                const isAdded = assignedQuestionIds.includes(q.id);
+                                return (
+                                    <div 
+                                        // Using composite key to handle potential duplicates in render only
+                                        key={`${q.id}-${index}`} 
+                                        className={`p-4 rounded-lg border transition-all ${
+                                            isAdded 
+                                            ? 'bg-green-50 border-green-200' 
+                                            : 'bg-white border-gray-200 hover:border-orange-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${q.type === 'TEST' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
+                                                        {q.type === 'TEST' ? 'Test' : 'Klasik'}
+                                                    </span>
+                                                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded">
+                                                        {getTopicName(q.topicId)}
+                                                    </span>
+                                                    {isAdded && (
+                                                        <span className="flex items-center text-green-700 text-xs font-bold px-2 py-0.5 bg-green-100 rounded">
+                                                            <CheckBadgeIcon className="h-3 w-3 mr-1" />
+                                                            Eklendi
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="font-medium text-gray-800 line-clamp-2">{q.text}</p>
+                                                {/* VISUAL DEBUG: Show ID to verify uniqueness */}
+                                                <span className="text-[10px] text-gray-300 mt-1 block font-mono">ID: {q.id}</span>
+                                            </div>
+                                            
+                                            <div className="flex flex-col justify-center min-w-[100px]">
+                                                {isAdded ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onRemoveSingle(q.id)}
+                                                        className="w-full px-3 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-bold flex items-center justify-center transition-colors shadow-sm"
+                                                        title="Sınavdan Çıkar"
+                                                    >
+                                                        <MinusIcon className="h-3 w-3 mr-1.5" />
+                                                        Çıkar
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onAddSingle(q.id)}
+                                                        className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-bold flex items-center justify-center transition-colors shadow-sm"
+                                                        title="Sınava Ekle"
+                                                    >
+                                                        <PlusIcon className="h-3 w-3 mr-1.5" />
+                                                        Ekle
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="text-center py-10 text-gray-500">
-                            Soru bankasında bu ders için soru bulunmamaktadır.
+                            {topicFilter ? 'Bu konuda soru bulunmamaktadır.' : 'Soru bankasında bu ders için soru bulunmamaktadır.'}
                         </div>
                     )}
                 </div>
 
-                <div className="p-4 border-t border-gray-200 bg-white rounded-b-xl flex justify-between items-center">
-                    <div className="text-sm text-gray-600 font-medium">
-                        {selectedIds.size} soru seçildi.
-                    </div>
-                    <div className="flex space-x-3">
-                        <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">İptal</button>
-                        <button 
-                            onClick={() => onSave(Array.from(selectedIds))} 
-                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-sm"
-                        >
-                            Seçilenleri Ekle
-                        </button>
-                    </div>
+                <div className="p-4 border-t border-gray-200 bg-white rounded-b-xl flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 font-medium"
+                    >
+                        Kapat
+                    </button>
                 </div>
             </div>
         </div>
@@ -105,10 +153,13 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
     courses,
     examCourses,
     questions,
+    topics,
     examCourseQuestions,
     onUpdateExamCourse,
     onAssignQuestions,
-    onRemoveQuestionFromExam
+    onRemoveQuestionFromExam,
+    onUpdateQuestionPoints,
+    onRecalculatePoints
 }) => {
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
     const [selectedExamId, setSelectedExamId] = useState('');
@@ -126,8 +177,6 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
     // Filter available courses for the selected teacher within the selected exam
     const availableCourses = useMemo(() => {
         if (!selectedTeacherId) return [];
-        
-        // Return ALL courses belonging to teacher
         return courses.filter(c => c.teacherId === selectedTeacherId);
     }, [selectedTeacherId, courses]);
 
@@ -152,50 +201,85 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
         }
     }, [selectedExamId, selectedCourseId, examCourses]);
 
-    // Get assigned questions
-    const assignedQuestions = useMemo(() => {
+    // Get assigned questions details including points from relation
+    const assignedQuestionsData = useMemo(() => {
         if (!selectedExamId || !selectedCourseId) return [];
-        const assignedIds = examCourseQuestions
-            .filter(ecq => ecq.examId === selectedExamId && ecq.courseId === selectedCourseId)
-            .map(ecq => ecq.questionId);
+        const relations = examCourseQuestions.filter(ecq => ecq.examId === selectedExamId && ecq.courseId === selectedCourseId);
         
-        return questions.filter(q => assignedIds.includes(q.id));
+        return relations.map(r => {
+            const q = questions.find(que => que.id === r.questionId);
+            if (!q) return null;
+            return {
+                ...q, // Question details
+                points: r.points, // Points from relation
+                relationId: r.id // Relation ID for updates if needed
+            };
+        }).filter((item): item is (Question & { points: number; relationId: string }) => !!item); 
     }, [selectedExamId, selectedCourseId, examCourseQuestions, questions]);
 
-    // Check if the ExamCourse is saved (exists)
-    const isDefinitionSaved = useMemo(() => {
-        return examCourses.some(ec => ec.examId === selectedExamId && ec.courseId === selectedCourseId);
+    const totalPoints = assignedQuestionsData.reduce((sum, item) => sum + (item.points || 0), 0);
+
+    // Check existing EC record
+    const existingEC = useMemo(() => {
+        return examCourses.find(ec => ec.examId === selectedExamId && ec.courseId === selectedCourseId);
     }, [examCourses, selectedExamId, selectedCourseId]);
+
+    // Workflow States
+    const isDraft = existingEC?.status === 'DRAFT';
+    const isReady = existingEC?.status === 'READY';
+    const isAdded = existingEC !== undefined; // Meaning record exists in some form
+
+    // Validation for Submission
+    const addedCount = assignedQuestionsData.length;
+    const isTargetReached = questionCount > 0 && addedCount >= questionCount;
 
     const handleSaveDefinition = () => {
         if (!selectedExamId || !selectedCourseId) return;
         
-        const existingEC = examCourses.find(ec => ec.examId === selectedExamId && ec.courseId === selectedCourseId);
-        
         onUpdateExamCourse({
-            id: existingEC ? existingEC.id : '', // Empty ID will trigger insertion in App.tsx
+            id: existingEC ? existingEC.id : '',
             examId: selectedExamId,
             courseId: selectedCourseId,
             instructions,
             duration,
             questionCount,
-            isConfirmed: existingEC ? existingEC.isConfirmed : false
+            isConfirmed: existingEC ? existingEC.isConfirmed : false,
+            status: 'DRAFT' // Explicitly set to Draft on save
         });
         
-        alert(existingEC ? 'Sınav tanımlamaları güncellendi.' : 'Ders sınava eklendi ve tanımlamalar kaydedildi.');
+        alert('Sınav ayarları kaydedildi. Durum: TASLAK');
     };
 
-    const handleAddQuestions = (ids: string[]) => {
-        if (selectedExamId && selectedCourseId) {
-            if (!isDefinitionSaved) {
-                alert('Lütfen önce sınav ayarlarını kaydediniz (dersi sınava ekleyiniz).');
-                return;
-            }
-
-            onAssignQuestions(selectedExamId, selectedCourseId, ids);
-            setIsModalOpen(false);
+    const handleSubmitExam = () => {
+        if (!existingEC) return;
+        if (!isTargetReached) {
+            alert('Soru sayısı hedeflenen sayıya ulaşmadan sınavı gönderemezsiniz.');
+            return;
         }
+
+        onUpdateExamCourse({
+            ...existingEC,
+            status: 'READY'
+        });
+        alert('Sınav başarıyla gönderildi. Durum: HAZIR');
     };
+
+    // Status Badge Logic
+    let statusBadgeClass = 'bg-gray-100 text-gray-600';
+    let statusText = 'Belirsiz';
+
+    if (questionCount > 0) {
+        if (addedCount < questionCount) {
+            statusBadgeClass = 'bg-red-100 text-red-700 border-red-200';
+            statusText = 'Eksik';
+        } else if (addedCount === questionCount) {
+            statusBadgeClass = 'bg-green-100 text-green-700 border-green-200';
+            statusText = 'Tamam';
+        } else {
+            statusBadgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            statusText = 'Fazla';
+        }
+    }
 
     return (
         <div className="container mx-auto h-full flex flex-col">
@@ -205,7 +289,6 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                     Sınav Tanımlama
                 </h2>
                 
-                {/* Teacher Selector */}
                 <div className="flex items-center bg-white p-2 rounded-lg shadow-sm border border-orange-200">
                     <span className="text-sm text-gray-500 mr-2 font-medium">Aktif Öğretmen:</span>
                     <select 
@@ -260,10 +343,17 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                             >
                                 <option value="">-- Ders Seçiniz --</option>
                                 {availableCourses.map(c => {
-                                    const isAdded = examCourses.some(ec => ec.examId === selectedExamId && ec.courseId === c.id);
+                                    const ec = examCourses.find(item => item.examId === selectedExamId && item.courseId === c.id);
+                                    let statusLabel = '';
+                                    if (ec) {
+                                        if (ec.isConfirmed) statusLabel = '(Eklendi)';
+                                        else if (ec.status === 'READY') statusLabel = '(Hazır)';
+                                        else if (ec.status === 'DRAFT') statusLabel = '(Taslak)';
+                                    }
+                                    
                                     return (
                                         <option key={c.id} value={c.id}>
-                                            {c.code} - {c.name} {isAdded ? '(Eklendi)' : ''}
+                                            {c.code} - {c.name} {statusLabel}
                                         </option>
                                     );
                                 })}
@@ -278,7 +368,11 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* Left: Definitions */}
                             <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-md h-fit">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Sınav Ayarları</h3>
+                                <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2 flex justify-between items-center">
+                                    Sınav Ayarları
+                                    {isDraft && <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-bold uppercase">Taslak</span>}
+                                    {isReady && <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-bold uppercase">Hazır</span>}
+                                </h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Yönerge</label>
@@ -286,7 +380,8 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                                             rows={4}
                                             value={instructions}
                                             onChange={(e) => setInstructions(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                                            disabled={isReady}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
                                             placeholder="Sınav kuralları ve açıklamaları..."
                                         />
                                     </div>
@@ -296,7 +391,8 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                                             type="number"
                                             value={questionCount}
                                             onChange={(e) => setQuestionCount(parseInt(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                                            disabled={isReady}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
                                         />
                                     </div>
                                     <div>
@@ -305,61 +401,128 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                                             type="number"
                                             value={duration}
                                             onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                                            disabled={isReady}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
                                         />
                                     </div>
-                                    <button 
-                                        onClick={handleSaveDefinition}
-                                        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
-                                    >
-                                        Ayarları Kaydet
-                                    </button>
+                                    
+                                    {isReady ? (
+                                        <button 
+                                            onClick={() => {
+                                                if (confirm('Sınavı tekrar taslak moduna almak istiyor musunuz? Yönetici onayı verilmişse bu işlem önerilmez.')) {
+                                                    onUpdateExamCourse({ ...existingEC!, status: 'DRAFT' });
+                                                }
+                                            }}
+                                            className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium shadow-sm text-sm"
+                                        >
+                                            Düzenlemeyi Aç (Taslak Yap)
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={handleSaveDefinition}
+                                            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+                                        >
+                                            Ayarları Kaydet
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Right: Questions */}
                             <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-md flex flex-col">
                                 <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                    <div>
+                                    <div className="flex items-center gap-3">
                                         <h3 className="text-lg font-bold text-gray-800">Sınav Soruları</h3>
-                                        <p className="text-sm text-gray-500">
-                                            Eklenen: {assignedQuestions.length} / Hedef: {questionCount}
-                                        </p>
+                                        {questionCount > 0 && (
+                                            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${statusBadgeClass}`}>
+                                                {addedCount} / {questionCount} Soru ({statusText})
+                                            </span>
+                                        )}
                                     </div>
+                                    <div className="text-right flex items-center gap-4">
+                                        <p className="text-sm text-gray-500">
+                                            Toplam Puan: <span className={`font-bold ${Math.abs(totalPoints - 100) < 0.1 ? 'text-green-600' : 'text-red-500'}`}>{totalPoints.toFixed(2)}</span>
+                                        </p>
+                                        
+                                        {/* SUBMIT EXAM BUTTON */}
+                                        {!isReady && isDraft && (
+                                            <button
+                                                onClick={handleSubmitExam}
+                                                disabled={!isTargetReached}
+                                                className={`px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center ${
+                                                    isTargetReached
+                                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                }`}
+                                                title={!isTargetReached ? 'Hedef soru sayısına ulaşılmalı' : 'Yönetici onayına gönder'}
+                                            >
+                                                <CheckCircleIcon className="h-4 w-4 mr-1.5" />
+                                                Sınavı Gönder
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-end gap-2 mb-4">
+                                    <button
+                                        onClick={() => onRecalculatePoints(selectedExamId, selectedCourseId)}
+                                        disabled={assignedQuestionsData.length === 0 || isReady}
+                                        className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${isReady ? 'bg-gray-100 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200'}`}
+                                        title="Tüm puanları eşit dağıt (100 / Soru Sayısı)"
+                                    >
+                                        Puanları Eşitle
+                                    </button>
                                     <button 
                                         onClick={() => setIsModalOpen(true)}
-                                        disabled={!isDefinitionSaved}
-                                        title={!isDefinitionSaved ? "Önce ayarları kaydediniz" : ""}
+                                        disabled={!isAdded || isReady}
+                                        title={!isAdded ? "Önce ayarları kaydediniz" : isReady ? "Sınav hazır durumdayken soru eklenemez" : ""}
                                         className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-sm ${
-                                            !isDefinitionSaved 
+                                            !isAdded || isReady
                                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                             : 'bg-orange-500 text-white hover:bg-orange-600'
                                         }`}
                                     >
                                         <StackIcon className="h-4 w-4 mr-2" />
-                                        Sınava Soru Ekle
+                                        Soru Ekle
                                     </button>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto max-h-[500px] bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                    {assignedQuestions.length > 0 ? (
+                                    {assignedQuestionsData.length > 0 ? (
                                         <div className="space-y-3">
-                                            {assignedQuestions.map((q, idx) => (
+                                            {assignedQuestionsData.map((q, idx) => (
                                                 <div key={q.id} className="bg-white p-3 rounded border border-gray-200 hover:shadow-sm flex justify-between items-start">
-                                                    <div>
-                                                        <div className="flex items-center mb-1">
-                                                            <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded mr-2">#{idx + 1}</span>
-                                                            <span className="text-xs text-gray-500 font-medium">{q.points} Puan</span>
+                                                    <div className="flex-1 mr-4">
+                                                        <div className="flex items-center mb-1 gap-2">
+                                                            <span className="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">#{idx + 1}</span>
+                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${q.type === 'TEST' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
+                                                                {q.type === 'TEST' ? 'Test' : 'Klasik'}
+                                                            </span>
                                                         </div>
-                                                        <p className="text-sm text-gray-800">{q.text}</p>
+                                                        <p className="text-sm text-gray-800 line-clamp-2">{q.text}</p>
                                                     </div>
-                                                    <button 
-                                                        onClick={() => onRemoveQuestionFromExam(selectedExamId, selectedCourseId, q.id)}
-                                                        className="text-red-400 hover:text-red-600 p-1"
-                                                        title="Sınavdan Çıkar"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                    </button>
+                                                    
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="flex flex-col items-end">
+                                                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-0.5">Puan</label>
+                                                            <input 
+                                                                type="number" 
+                                                                value={q.points}
+                                                                disabled={isReady}
+                                                                onChange={(e) => onUpdateQuestionPoints(selectedExamId, selectedCourseId, q.id!, parseFloat(e.target.value) || 0)}
+                                                                className="w-16 px-2 py-1 text-sm border rounded text-center focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
+                                                            />
+                                                        </div>
+                                                        {!isReady && (
+                                                            <button 
+                                                                onClick={() => onRemoveQuestionFromExam(selectedExamId, selectedCourseId, q.id!)}
+                                                                className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"
+                                                                title="Sınavdan Çıkar"
+                                                            >
+                                                                <TrashIcon className="h-5 w-5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -380,8 +543,10 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                 <QuestionSelectionModal 
                     course={courses.find(c => c.id === selectedCourseId)!}
                     allQuestions={questions.filter(q => q.courseId === selectedCourseId)}
-                    assignedQuestionIds={assignedQuestions.map(q => q.id)}
-                    onSave={handleAddQuestions}
+                    topics={topics}
+                    assignedQuestionIds={assignedQuestionsData.map(q => q.id!)}
+                    onAddSingle={(id) => onAssignQuestions(selectedExamId, selectedCourseId, [id])}
+                    onRemoveSingle={(id) => onRemoveQuestionFromExam(selectedExamId, selectedCourseId, id)}
                     onClose={() => setIsModalOpen(false)}
                 />
             )}

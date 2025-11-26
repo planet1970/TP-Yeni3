@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
@@ -26,7 +27,7 @@ import TaskArchivePage from './pages/TaskArchivePage';
 import TaskCardsPage from './pages/TaskCardsPage';
 import TeacherExamDefinitionPage from './pages/TeacherExamDefinitionPage';
 import TeacherQuestionBankPage from './pages/TeacherQuestionBankPage';
-import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, Attendant, StudentCourseRegistration, StudentHallAssignment, AttendantAssignment, TaskRequest, Question, ExamCourseQuestion } from './types';
+import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, Attendant, StudentCourseRegistration, StudentHallAssignment, AttendantAssignment, TaskRequest, Question, ExamCourseQuestion, Topic } from './types';
 import { 
   BellIcon, 
   CogIcon, 
@@ -63,6 +64,15 @@ function usePersistedState<T>(key: string, initialValue: T) {
 
   return [state, setState] as const;
 }
+
+// --- ROBUST ID GENERATOR ---
+const generateUniqueId = (prefix: string) => {
+    // Add performance.now() to ensure uniqueness even if called in same millisecond
+    const perf = typeof performance !== 'undefined' ? performance.now().toString().replace('.', '') : '';
+    const random = Math.random().toString(36).substr(2, 9);
+    const timestamp = Date.now();
+    return `${prefix}-${timestamp}-${perf}-${random}`;
+};
 
 // --- INITIAL DATA (Rich Mock Data based on User Scenario) ---
 
@@ -146,9 +156,8 @@ const initialStudentsData: Student[] = [
 ];
 
 const initialExamCoursesData: ExamCourse[] = [
-    // Mock data assumed to be confirmed for initial view
-    { id: 'EC001', examId: 'E001', courseId: 'C001', questionCount: 20, duration: 30, isConfirmed: true },
-    { id: 'EC002', examId: 'E001', courseId: 'C002', questionCount: 25, duration: 40, isConfirmed: true },
+    { id: 'EC001', examId: 'E001', courseId: 'C001', questionCount: 20, duration: 30, isConfirmed: true, status: 'READY' },
+    { id: 'EC002', examId: 'E001', courseId: 'C002', questionCount: 25, duration: 40, isConfirmed: true, status: 'READY' },
 ];
 
 const initialSessionCoursesData: SessionCourse[] = [];
@@ -205,7 +214,7 @@ const App: React.FC = () => {
   const [activePage, setActivePage] = useState<PageState>({ page: 'dashboard' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Persistent State using localStorage - KEY NAMES UPDATED TO _v1 TO LOAD NEW MOCK DATA
+  // Persistent State using localStorage - UPDATED TO _v8 TO CLEAN UP BAD DATA (DUPLICATE IDs)
   const [schools, setSchools] = usePersistedState<School[]>('ems_schools_v1', initialSchoolsData);
   const [departments, setDepartments] = usePersistedState<Department[]>('ems_departments_v1', allDepartmentsData);
   const [buildings, setBuildings] = usePersistedState<Building[]>('ems_buildings_v1', initialBuildingsData);
@@ -230,9 +239,10 @@ const App: React.FC = () => {
   const [attendantAssignments, setAttendantAssignments] = usePersistedState<AttendantAssignment[]>('ems_attendantAssignments_v1', []);
   const [taskRequests, setTaskRequests] = usePersistedState<TaskRequest[]>('ems_taskRequests_v1', []);
 
-  // Teacher Module State
-  const [questions, setQuestions] = usePersistedState<Question[]>('ems_questions_v1', []);
-  const [examCourseQuestions, setExamCourseQuestions] = usePersistedState<ExamCourseQuestion[]>('ems_examCourseQuestions_v1', []);
+  // Teacher Module State - KEY v8 TO RESET CORRUPTED DATA
+  const [questions, setQuestions] = usePersistedState<Question[]>('ems_questions_v8', []);
+  const [examCourseQuestions, setExamCourseQuestions] = usePersistedState<ExamCourseQuestion[]>('ems_examCourseQuestions_v5', []);
+  const [topics, setTopics] = usePersistedState<Topic[]>('ems_topics_v1', []);
 
 
   const handleNavigate = (pageState: PageState) => {
@@ -242,7 +252,7 @@ const App: React.FC = () => {
 
   // --- School CRUD Handlers ---
   const handleAddSchool = (schoolData: Omit<School, 'id'>) => {
-    const newSchool: School = { id: `S00${Date.now()}`, ...schoolData };
+    const newSchool: School = { id: generateUniqueId('S'), ...schoolData };
     setSchools([newSchool, ...schools]);
   };
   const handleUpdateSchool = (updatedSchool: School) => {
@@ -255,7 +265,7 @@ const App: React.FC = () => {
 
   // --- Department CRUD Handlers ---
   const handleAddDepartment = (departmentData: Omit<Department, 'id'>) => {
-    const newDepartment: Department = { id: `D${Date.now()}`, ...departmentData };
+    const newDepartment: Department = { id: generateUniqueId('D'), ...departmentData };
     setDepartments([newDepartment, ...departments]);
   };
   const handleUpdateDepartment = (updatedDepartment: Department) => {
@@ -268,7 +278,7 @@ const App: React.FC = () => {
 
   // --- Building CRUD Handlers ---
     const handleAddBuilding = (buildingData: Omit<Building, 'id'>) => {
-        const newBuilding: Building = { id: `B${Date.now()}`, ...buildingData };
+        const newBuilding: Building = { id: generateUniqueId('B'), ...buildingData };
         setBuildings([newBuilding, ...buildings]);
     };
     const handleUpdateBuilding = (updatedBuilding: Building) => {
@@ -281,7 +291,7 @@ const App: React.FC = () => {
 
   // --- Hall CRUD Handlers ---
     const handleAddHall = (hallData: Omit<Hall, 'id'>) => {
-        const newHall: Hall = { id: `H${Date.now()}`, ...hallData };
+        const newHall: Hall = { id: generateUniqueId('H'), ...hallData };
         setHalls([newHall, ...halls]);
     };
     const handleUpdateHall = (updatedHall: Hall) => {
@@ -293,7 +303,7 @@ const App: React.FC = () => {
 
   // --- Course CRUD Handlers ---
     const handleAddCourse = (courseData: Omit<Course, 'id'>) => {
-        const newCourse: Course = { id: `C${Date.now()}`, ...courseData };
+        const newCourse: Course = { id: generateUniqueId('C'), ...courseData };
         setCourses([newCourse, ...courses]);
     };
     const handleUpdateCourse = (updatedCourse: Course) => {
@@ -305,7 +315,7 @@ const App: React.FC = () => {
     
   // --- Exam CRUD Handlers ---
     const handleAddExam = (examData: Omit<Exam, 'id' | 'isActive'>) => {
-        const newExam: Exam = { id: `E${Date.now()}`, ...examData, isActive: false };
+        const newExam: Exam = { id: generateUniqueId('E'), ...examData, isActive: false };
         setExams([newExam, ...exams]);
     };
     const handleUpdateExam = (updatedExam: Exam) => {
@@ -321,7 +331,7 @@ const App: React.FC = () => {
 
   // --- Session CRUD Handlers ---
     const handleAddSession = (sessionData: Omit<Session, 'id' | 'isActive'>) => {
-        const newSession: Session = { id: `SS${Date.now()}`, ...sessionData, isActive: true };
+        const newSession: Session = { id: generateUniqueId('SS'), ...sessionData, isActive: true };
         setSessions([newSession, ...sessions]);
     };
     const handleUpdateSession = (updatedSession: Session) => {
@@ -343,7 +353,7 @@ const App: React.FC = () => {
             return;
         }
         const newSD: SessionDepartment = {
-            id: `SD${Date.now()}`,
+            id: generateUniqueId('SD'),
             sessionId,
             departmentId
         };
@@ -362,7 +372,7 @@ const App: React.FC = () => {
             return;
         }
         const newSC: SessionCourse = {
-            id: `SC${Date.now()}`,
+            id: generateUniqueId('SC'),
             sessionId,
             courseId
         };
@@ -374,41 +384,36 @@ const App: React.FC = () => {
     };
 
     // --- ExamCourse Handlers ---
-    // This handler is used by ADMIN to Confirm the course or TEACHER to upsert definition
     const handleAddExamCourse = (examId: string, courseId: string, questionCount: number, duration: number) => {
-        // Admin "Adding" implies confirming the existing definition
         setExamCourses(prev => {
             const existing = prev.find(ec => ec.examId === examId && ec.courseId === courseId);
             if (existing) {
                 return prev.map(ec => ec.id === existing.id ? { ...existing, isConfirmed: true } : ec);
             } else {
-                // Should not ideally happen if workflow is Teacher Defined -> Admin Confirms
-                // But fallback for manual admin entry if allowed
                 return [...prev, {
-                    id: `EC${Date.now()}`,
+                    id: generateUniqueId('EC'),
                     examId,
                     courseId,
                     questionCount,
                     duration,
-                    isConfirmed: true
+                    isConfirmed: true,
+                    status: 'READY' 
                 }];
             }
         });
     };
 
-    // Updated to handle definition updates (instructions, etc.) AND inserting new ones if they don't exist
     const handleUpdateExamCourse = (examCourseData: ExamCourse) => {
         setExamCourses(prev => {
             const existing = prev.find(ec => ec.examId === examCourseData.examId && ec.courseId === examCourseData.courseId);
             if (existing) {
-                // Update existing, preserve ID and existing confirmed status unless explicitly changed
                 return prev.map(ec => ec.id === existing.id ? { ...existing, ...examCourseData } : ec);
             } else {
-                // Add new if it doesn't exist (Upsert) - Default not confirmed
                 const newEC: ExamCourse = {
                     ...examCourseData,
-                    id: examCourseData.id || `EC${Date.now()}`,
-                    isConfirmed: examCourseData.isConfirmed || false 
+                    id: examCourseData.id || generateUniqueId('EC'),
+                    isConfirmed: examCourseData.isConfirmed || false,
+                    status: examCourseData.status || 'DRAFT'
                 };
                 return [...prev, newEC];
             }
@@ -425,7 +430,7 @@ const App: React.FC = () => {
             return;
         }
         const newEH: ExamHall = {
-            id: `EH${Date.now()}`,
+            id: generateUniqueId('EH'),
             examId,
             hallId
         };
@@ -442,7 +447,7 @@ const App: React.FC = () => {
             return;
         }
         const newSH: SessionHall = {
-            id: `SH${Date.now()}-${Math.random().toString(36).substr(2,9)}`,
+            id: generateUniqueId('SH'),
             sessionId,
             departmentId,
             hallId
@@ -457,7 +462,6 @@ const App: React.FC = () => {
     // --- Student Hall Assignments Handlers ---
     const handleSaveStudentHallAssignments = (sessionId: string, departmentId: string, newAssignments: StudentHallAssignment[]) => {
         setStudentHallAssignments(prev => {
-            // Remove old assignments for this specific session and department
             const filtered = prev.filter(a => !(a.sessionId === sessionId && a.departmentId === departmentId));
             return [...filtered, ...newAssignments];
         });
@@ -481,7 +485,7 @@ const App: React.FC = () => {
         });
 
         setStudentCourseRegistrations(prevRegs => {
-             const addedRegs = newRegistrations.map(r => ({ ...r, id: `SCR${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }));
+             const addedRegs = newRegistrations.map(r => ({ ...r, id: generateUniqueId('SCR') }));
              return [...prevRegs, ...addedRegs];
         });
     };
@@ -497,7 +501,7 @@ const App: React.FC = () => {
                 return prev;
             }
             const newReg: StudentCourseRegistration = {
-                id: `SCR${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: generateUniqueId('SCR'),
                 examId,
                 courseId,
                 studentId: student.id
@@ -514,7 +518,7 @@ const App: React.FC = () => {
 
     // --- Teacher CRUD Handlers ---
     const handleAddTeacher = (teacherData: Omit<Teacher, 'id'>) => {
-        const newTeacher: Teacher = { id: `T${Date.now()}`, ...teacherData };
+        const newTeacher: Teacher = { id: generateUniqueId('T'), ...teacherData };
         setTeachers([newTeacher, ...teachers]);
     };
     const handleUpdateTeacher = (updatedTeacher: Teacher) => {
@@ -526,7 +530,7 @@ const App: React.FC = () => {
 
     // --- Attendant CRUD Handlers ---
     const handleAddAttendant = (attendantData: Omit<Attendant, 'id' | 'isActive'>) => {
-        const newAttendant: Attendant = { id: `A${Date.now()}`, ...attendantData, isActive: true };
+        const newAttendant: Attendant = { id: generateUniqueId('A'), ...attendantData, isActive: true };
         setAttendants([newAttendant, ...attendants]);
     };
     const handleUpdateAttendant = (updatedAttendant: Attendant) => {
@@ -560,7 +564,7 @@ const App: React.FC = () => {
             if (attendantId === "") return filtered;
 
             return [...filtered, {
-                id: `AA-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                id: generateUniqueId('AA'),
                 sessionId,
                 buildingId,
                 hallId,
@@ -582,7 +586,7 @@ const App: React.FC = () => {
         setTaskRequests(prev => {
             if (prev.some(r => r.attendantId === attendantId && r.sessionId === sessionId)) return prev;
             return [...prev, {
-                id: `TR-${Date.now()}`,
+                id: generateUniqueId('TR'),
                 attendantId,
                 sessionId,
                 status: 'PENDING',
@@ -595,11 +599,26 @@ const App: React.FC = () => {
         setTaskRequests(prev => prev.filter(r => !(r.attendantId === attendantId && r.sessionId === sessionId)));
     };
 
+    // --- Topic Handlers ---
+    const handleAddTopic = (topicData: Omit<Topic, 'id'>) => {
+        const newTopic: Topic = {
+            id: generateUniqueId('TOPIC'),
+            ...topicData
+        };
+        setTopics(prev => [...prev, newTopic]);
+    };
+
+    const handleDeleteTopic = (topicId: string) => {
+        setTopics(prev => prev.filter(t => t.id !== topicId));
+    };
+
     // --- Question Handlers ---
     const handleAddQuestion = (questionData: Omit<Question, 'id'>) => {
+        // FORCE NEW UNIQUE ID
+        const uniqueId = generateUniqueId('Q');
         const newQuestion: Question = {
-            id: `Q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            ...questionData
+            ...questionData,
+            id: uniqueId
         };
         setQuestions(prev => [newQuestion, ...prev]);
     };
@@ -610,31 +629,89 @@ const App: React.FC = () => {
 
     const handleDeleteQuestion = (questionId: string) => {
         setQuestions(prev => prev.filter(q => q.id !== questionId));
-        // Also remove from exam assignments
         setExamCourseQuestions(prev => prev.filter(ecq => ecq.questionId !== questionId));
     };
 
     // --- Exam Question Assignment Handlers ---
     const handleAssignQuestionsToExam = (examId: string, courseId: string, questionIds: string[]) => {
         setExamCourseQuestions(prev => {
-            // Filter out duplicates that already exist for this pair to avoid duplicate keys or entries
-            const existingIds = new Set(prev.filter(ecq => ecq.examId === examId && ecq.courseId === courseId).map(ecq => ecq.questionId));
+            // Get existing questions for this exam-course
+            const existingForThisExam = prev.filter(ecq => ecq.examId === examId && ecq.courseId === courseId);
+            const existingIds = new Set(existingForThisExam.map(ecq => ecq.questionId));
             
-            const newAssignments = questionIds
-                .filter(qid => !existingIds.has(qid))
-                .map(qid => ({
-                    id: `ECQ-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                    examId,
-                    courseId,
-                    questionId: qid
-                }));
+            // Identify questions to add (avoid duplicates)
+            const questionsToAdd = questionIds.filter(qid => !existingIds.has(qid));
+            
+            // If nothing to add, return previous state
+            if (questionsToAdd.length === 0) return prev;
+
+            // Calculate equal points
+            const totalQuestions = existingForThisExam.length + questionsToAdd.length;
+            const pointPerQuestion = totalQuestions > 0 ? parseFloat((100 / totalQuestions).toFixed(2)) : 0;
+
+            // 1. Update existing questions with new points
+            const updatedExisting = prev.map(ecq => {
+                if (ecq.examId === examId && ecq.courseId === courseId) {
+                    return { ...ecq, points: pointPerQuestion };
+                }
+                return ecq;
+            });
+
+            // 2. Create new assignments with ROBUST IDs
+            const newAssignments = questionsToAdd.map(qid => ({
+                id: generateUniqueId('ECQ'),
+                examId,
+                courseId,
+                questionId: qid,
+                points: pointPerQuestion
+            }));
                 
-            return [...prev, ...newAssignments];
+            return [...updatedExisting, ...newAssignments];
         });
     };
 
     const handleRemoveQuestionFromExam = (examId: string, courseId: string, questionId: string) => {
-        setExamCourseQuestions(prev => prev.filter(ecq => !(ecq.examId === examId && ecq.courseId === courseId && ecq.questionId === questionId)));
+        setExamCourseQuestions(prev => {
+            const remaining = prev.filter(ecq => !(ecq.examId === examId && ecq.courseId === courseId && ecq.questionId === questionId));
+            
+            // Recalculate points for remaining
+            const relevant = remaining.filter(ecq => ecq.examId === examId && ecq.courseId === courseId);
+            const count = relevant.length;
+            const newPoints = count > 0 ? parseFloat((100 / count).toFixed(2)) : 0;
+
+            return remaining.map(ecq => {
+                if (ecq.examId === examId && ecq.courseId === courseId) {
+                    return { ...ecq, points: newPoints };
+                }
+                return ecq;
+            });
+        });
+    };
+
+    const handleUpdateExamQuestionPoints = (examId: string, courseId: string, questionId: string, newPoints: number) => {
+        setExamCourseQuestions(prev => prev.map(ecq => {
+            if (ecq.examId === examId && ecq.courseId === courseId && ecq.questionId === questionId) {
+                return { ...ecq, points: newPoints };
+            }
+            return ecq;
+        }));
+    };
+
+    const handleRecalculatePoints = (examId: string, courseId: string) => {
+        setExamCourseQuestions(prev => {
+            const relevant = prev.filter(ecq => ecq.examId === examId && ecq.courseId === courseId);
+            const count = relevant.length;
+            if (count === 0) return prev;
+
+            const newPoints = parseFloat((100 / count).toFixed(2));
+
+            return prev.map(ecq => {
+                if (ecq.examId === examId && ecq.courseId === courseId) {
+                    return { ...ecq, points: newPoints };
+                }
+                return ecq;
+            });
+        });
     };
 
 
@@ -650,6 +727,7 @@ const App: React.FC = () => {
                   courses={courses}
                   schools={schools}
                />;
+      // ... other cases ...
       case 'schools':
         return <SchoolsPage 
                   schools={schools}
@@ -786,127 +864,18 @@ const App: React.FC = () => {
                     buildings={buildings}
                     halls={halls}
                 />;
-      case 'exams':
-        return <ExamsPage
-                    exams={exams}
-                    onAdd={handleAddExam}
-                    onUpdate={handleUpdateExam}
-                    onDelete={handleDeleteExam}
-                    onToggleStatus={handleToggleExamStatus}
-                    onNavigate={handleNavigate}
-                />;
-      case 'sessions':
-        return <SessionsPage
-                    initialExamId={activePage.context?.examId}
-                    allExams={exams}
-                    allSessions={sessions}
-                    allDepartments={departments}
-                    sessionDepartments={sessionDepartments}
-                    onAdd={handleAddSession}
-                    onUpdate={handleUpdateSession}
-                    onDelete={handleDeleteSession}
-                    onToggleStatus={handleToggleSessionStatus}
-                    onNavigate={handleNavigate}
-                    onAddSessionDepartment={handleAddSessionDepartment}
-                    onRemoveSessionDepartment={handleRemoveSessionDepartment}
-                />;
-      case 'exam-courses':
-          return <ExamCoursesPage
-                    exams={exams}
-                    schools={schools}
-                    departments={departments}
-                    courses={courses}
-                    examCourses={examCourses}
-                    onAddExamCourse={handleAddExamCourse}
-                    onRemoveExamCourse={handleRemoveExamCourse}
-                />;
-      case 'exam-halls':
-          return <ExamHallsPage
-                    exams={exams}
-                    buildings={buildings}
-                    halls={halls}
-                    examHalls={examHalls}
-                    onAddExamHall={handleAddExamHall}
-                    onRemoveExamHall={handleRemoveExamHall}
-                />;
-      case 'student-registrations':
-          return <StudentCourseRegistrationsPage
-                    exams={exams}
-                    courses={courses}
-                    examCourses={examCourses}
-                    students={students}
-                    studentCourseRegistrations={studentCourseRegistrations}
-                    onImportRegistrations={handleImportStudentRegistrations}
-                    onAddSingleRegistration={handleAddSingleRegistration}
-                    onRemoveRegistration={handleRemoveRegistration}
-                />;
-      case 'session-courses':
-          return <SessionCoursesPage
-                    exams={exams}
-                    sessions={sessions}
-                    departments={departments}
-                    courses={courses}
-                    examCourses={examCourses}
-                    sessionDepartments={sessionDepartments}
-                    sessionCourses={sessionCourses}
-                    studentCourseRegistrations={studentCourseRegistrations}
-                    onAddSessionCourse={handleAddSessionCourse}
-                    onRemoveSessionCourse={handleRemoveSessionCourse}
-                />;
-      case 'session-halls':
-          return <SessionHallsPage
-                    exams={exams}
-                    sessions={sessions}
-                    departments={departments}
-                    halls={halls}
-                    courses={courses}
-                    examHalls={examHalls}
-                    sessionDepartments={sessionDepartments}
-                    sessionCourses={sessionCourses}
-                    sessionHalls={sessionHalls}
-                    studentCourseRegistrations={studentCourseRegistrations}
-                    onAddSessionHall={handleAddSessionHall}
-                    onRemoveSessionHall={handleRemoveSessionHall}
-                />;
-      case 'session-students':
-          return <SessionStudentsPage
-                    exams={exams}
-                    sessions={sessions}
-                    departments={departments}
-                    halls={halls}
-                    students={students}
-                    courses={courses}
-                    sessionDepartments={sessionDepartments}
-                    sessionHalls={sessionHalls}
-                    sessionCourses={sessionCourses}
-                    studentCourseRegistrations={studentCourseRegistrations}
-                    studentHallAssignments={studentHallAssignments}
-                    onSaveAssignments={handleSaveStudentHallAssignments}
-                    onResetAssignments={handleResetStudentHallAssignments}
-                />;
-      case 'session-inquiry':
-          return <SessionInquiryPage
-                    students={students}
-                    exams={exams}
-                    sessions={sessions}
-                    halls={halls}
-                    courses={courses}
-                    departments={departments}
-                    studentHallAssignments={studentHallAssignments}
-                    sessionCourses={sessionCourses}
-                    studentCourseRegistrations={studentCourseRegistrations}
-                    buildings={buildings}
-                    schools={schools}
-                />;
       // --- Teacher Module Routes ---
       case 'teacher-question-bank':
           return <TeacherQuestionBankPage
                     teachers={teachers}
                     courses={courses}
                     questions={questions}
+                    topics={topics}
                     onAddQuestion={handleAddQuestion}
                     onUpdateQuestion={handleUpdateQuestion}
                     onDeleteQuestion={handleDeleteQuestion}
+                    onAddTopic={handleAddTopic}
+                    onDeleteTopic={handleDeleteTopic}
                 />;
       case 'teacher-exam-definition':
           return <TeacherExamDefinitionPage
@@ -915,10 +884,13 @@ const App: React.FC = () => {
                     courses={courses}
                     examCourses={examCourses}
                     questions={questions}
+                    topics={topics}
                     examCourseQuestions={examCourseQuestions}
                     onUpdateExamCourse={handleUpdateExamCourse}
                     onAssignQuestions={handleAssignQuestionsToExam}
                     onRemoveQuestionFromExam={handleRemoveQuestionFromExam}
+                    onUpdateQuestionPoints={handleUpdateExamQuestionPoints}
+                    onRecalculatePoints={handleRecalculatePoints}
                 />;
       default:
         return <DashboardPage 

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { TrashIcon, BookOpenIcon, CheckBadgeIcon } from '../components/icons';
 import type { Exam, School, Department, Course, ExamCourse } from '../types';
@@ -74,19 +75,29 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
         const ec = examCourses.find(e => e.examId === selectedExamId && e.courseId === courseId);
         
         if (!ec) {
-            return { status: 'WAITING', label: 'Bekleniyor', disabled: true, color: 'bg-gray-100 text-gray-400' };
+            return { status: 'WAITING', label: 'Bekleniyor', disabled: true, color: 'bg-gray-100 text-gray-400', duration: 0 };
         }
         
-        if (!ec.isConfirmed) {
+        if (ec.isConfirmed) {
+            return { status: 'ADDED', label: 'Eklendi', disabled: true, color: 'bg-blue-100 text-blue-700', duration: ec.duration };
+        }
+
+        // Teacher Workflow States
+        if (ec.status === 'DRAFT') {
+            return { status: 'DRAFT', label: 'Taslak', disabled: true, color: 'bg-yellow-100 text-yellow-700 cursor-default', duration: ec.duration };
+        }
+
+        if (ec.status === 'READY') {
             return { status: 'READY', label: 'Ekle', disabled: false, color: 'bg-green-100 text-green-700 hover:bg-green-200', duration: ec.duration };
         }
         
-        return { status: 'ADDED', label: 'Eklendi', disabled: true, color: 'bg-blue-100 text-blue-700', duration: ec.duration };
+        // Fallback
+        return { status: 'UNKNOWN', label: 'Bekleniyor', disabled: true, color: 'bg-gray-100 text-gray-400', duration: 0 };
     };
 
     const handleAddCourse = (courseId: string) => {
         if (selectedExamId) {
-            // We pass placeholders for count/duration as the handler in App.tsx will look up existing record
+            // We pass placeholders for count/duration as the handler in App.tsx will look up existing record and confirm it
             onAddExamCourse(selectedExamId, courseId, 0, 0); 
         }
     };
@@ -251,7 +262,7 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
                                 <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm p-4">
                                     <BookOpenIcon className="h-12 w-12 mb-2 opacity-20" />
                                     <p>Bu sınava henüz ders eklenmemiş.</p>
-                                    <p className="text-xs mt-1">Sol panelden öğretmen tarafından tanımlanmış dersleri seçerek ekleyebilirsiniz.</p>
+                                    <p className="text-xs mt-1">Sol panelden (öğretmen onayı almış) dersleri seçerek ekleyebilirsiniz.</p>
                                 </div>
                             )}
                          </div>

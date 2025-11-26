@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export interface NavItemType {
@@ -103,6 +104,7 @@ export interface ExamCourse {
     duration: number; // in minutes
     instructions?: string; // Exam instructions (Yönerge)
     isConfirmed: boolean; // Admin approval status
+    status?: 'DRAFT' | 'READY'; // Teacher workflow status
 }
 
 export interface ExamHall {
@@ -180,13 +182,22 @@ export interface TaskRequest {
 }
 
 // --- Teacher Module Types ---
+
+export interface Topic {
+    id: string;
+    courseId: string;
+    name: string;
+}
+
 export interface Question {
     id: string;
     courseId: string;
+    topicId?: string; // Linked Topic
+    type: 'TEST' | 'CLASSIC'; // Question Type
     text: string;
-    options: string[]; // Array of 4 or 5 options
-    correctAnswer: string; // Index of correct option
-    points: number;
+    options?: string[]; // Array of 4 or 5 options (Only for TEST)
+    correctAnswer?: string; // Index of correct option (Only for TEST)
+    // Points removed from Question Bank
 }
 
 export interface ExamCourseQuestion {
@@ -194,4 +205,5 @@ export interface ExamCourseQuestion {
     examId: string;
     courseId: string;
     questionId: string;
+    points: number; // Points are now specific to the Exam context
 }
