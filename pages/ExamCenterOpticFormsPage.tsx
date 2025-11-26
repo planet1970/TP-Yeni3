@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { PrinterIcon, CheckCircleIcon, QrCodeIcon } from '../components/icons';
+import { PrinterIcon, CheckCircleIcon, QrCodeIcon, DocumentArrowDownIcon } from '../components/icons';
 import type { Exam, Session, Department, Hall, Student, SessionDepartment, SessionHall, SessionCourse, Course, StudentHallAssignment, StudentCourseRegistration, Attendant, AttendantAssignment, HallListPrintStatus } from '../types';
+import { jsPDF } from 'jspdf';
 
 interface ExamCenterOpticFormsPageProps {
     exams: Exam[];
@@ -25,7 +26,6 @@ interface ReportData {
     session: Session;
     department: Department;
     hall: Hall;
-    students: Student[];
     courses: Course[];
 }
 
@@ -59,7 +59,6 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                     .map(sh => halls.find(h => h.id === sh.hallId))
                     .filter((h): h is Hall => !!h);
                 
-                // Find Courses assigned to this Session AND Department
                 const relevantCourses = courses.filter(c => {
                     const inSession = sessionCourses.some(sc => sc.sessionId === session.id && sc.courseId === c.id);
                     return inSession && c.departmentId === dept.id;
@@ -73,23 +72,10 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
     }, [selectedExamId, sessions, sessionDepartments, departments, sessionHalls, halls, sessionCourses, courses]);
 
     const handleShowReport = (session: Session, department: Department, hall: Hall, coursesList: Course[]) => {
-        // Get Students assigned to this specific Hall for this Session & Department
-        const relevantAssignments = studentHallAssignments.filter(sha => 
-            sha.sessionId === session.id && 
-            sha.departmentId === department.id && 
-            sha.hallId === hall.id
-        );
-        
-        const assignedStudents = relevantAssignments
-            .map(sha => students.find(s => s.id === sha.studentId))
-            .filter((s): s is Student => !!s)
-            .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
-
         setSelectedReport({
             session,
             department,
             hall,
-            students: assignedStudents,
             courses: coursesList
         });
     };
@@ -105,16 +91,144 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
         }
     };
 
+    // Helper to convert Turkish chars to ASCII approximation for standard fonts
+    const tr = (text: string) => {
+        return text
+            .replace(/Ğ/g, "G").replace(/ğ/g, "g")
+            .replace(/Ü/g, "U").replace(/ü/g, "u")
+            .replace(/Ş/g, "S").replace(/ş/g, "s")
+            .replace(/İ/g, "I").replace(/ı/g, "i")
+            .replace(/Ö/g, "O").replace(/ö/g, "o")
+            .replace(/Ç/g, "C").replace(/ç/g, "c");
+    };
+
+    const handleGeneratePDF = (session: Session, department: Department, hall: Hall, coursesList: Course[]) => {
+        const assignedStudentIds = studentHallAssignments
+            .filter(sha => 
+                sha.sessionId === session.id && 
+                sha.departmentId === department.id && 
+                sha.hallId === hall.id
+            )
+            .map(sha => sha.studentId);
+
+        const assignedStudents = students
+            .filter(s => assignedStudentIds.includes(s.id))
+            .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
+
+        if (assignedStudents.length === 0) {
+            alert('Bu salonda öğrenci bulunmamaktadır.');
+            return;
+        }
+
+        const exam = exams.find(e => e.id === session.examId);
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        
+        assignedStudents.forEach((student, index) => {
+            if (index > 0) doc.addPage();
+
+            // --- 1. HEADER ---
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(249, 115, 22); // Orange
+            doc.setFontSize(14); 
+            doc.text(tr("TRAKYA UNIVERSITESI"), 105, 18, { align: 'center' });
+            
+            doc.setTextColor(0, 0, 0); // Black
+            doc.setFontSize(10);
+            doc.text(tr((exam?.name || "").toUpperCase()), 105, 24, { align: 'center' });
+
+            // --- 2. STUDENT NUMBER (Top Right Grid) ---
+            // Adjusted to fit the grid on the right
+            const snBoxX = 153.5; 
+            const snBoxY = 34;
+            const snGap = 4.7; 
+            const snVGap = 4.7; 
+            
+            const studentNumStr = student.studentNumber.padEnd(10, ' ');
+            
+            for (let col = 0; col < 10; col++) {
+                const char = studentNumStr[col] || '';
+                const xPos = snBoxX + (col * snGap);
+                
+                // Digit
+                doc.setFontSize(9);
+                doc.setTextColor(0);
+                doc.text(char, xPos + 1.75, snBoxY + 3, { align: 'center' });
+
+                // Filled Bubbles Only
+                for (let row = 0; row < 10; row++) {
+                    const isFilled = char === String(row);
+                    if (isFilled) {
+                        const yPos = snBoxY + 8.5 + (row * snVGap); 
+                        const centerX = xPos + 1.75;
+                        
+                        doc.setFillColor(0); 
+                        doc.circle(centerX, yPos, 1.6, 'F'); 
+                    }
+                }
+            }
+
+            // --- 3. SALON / SIRA NO (RED BOX - 1. Kutu) ---
+            // X: ~112mm (Indent from the checkboxes area)
+            // Y: Starts around 35-36mm
+            const infoBoxX = 112; 
+            const salonY = 36;  
+            const siraY = 42;
+            
+            doc.setFontSize(9); 
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0);
+            
+            // Value only (Labels are pre-printed)
+            doc.text(tr(hall.name), infoBoxX + 20, salonY); 
+            doc.text(String(index + 1), infoBoxX + 20, siraY);
+
+            // --- 4. IDENTITY INFO (BLUE BOX - 2. Kutu) ---
+            // Y: Starts around 53-54mm
+            const numaraY = 54;
+            const adiY = 60;
+            const soyadiY = 66;
+            const bolumuY = 72;
+            
+            doc.text(student.studentNumber, infoBoxX + 20, numaraY); 
+            doc.text(tr(student.firstName), infoBoxX + 20, adiY); 
+            doc.text(tr(student.lastName), infoBoxX + 20, soyadiY); 
+            
+            doc.setFontSize(7); 
+            const splitDept = doc.splitTextToSize(tr(department.name), 60);
+            doc.text(splitDept, infoBoxX + 20, bolumuY); 
+
+            // --- 5. COURSE COLUMNS (Bottom) ---
+            const colStartY = 114; 
+            const colWidth = 35.6; 
+            const colGap = 2; 
+            const leftMargin = 10; 
+            
+            coursesList.slice(0, 5).forEach((course, cIdx) => {
+                const colX = leftMargin + (cIdx * (colWidth + colGap));
+                const centerX = colX + (colWidth / 2);
+
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(0);
+                doc.text(course.code, centerX, colStartY, { align: 'center' });
+                
+                doc.setFontSize(6);
+                const splitName = doc.splitTextToSize(tr(course.name), colWidth - 4);
+                doc.text(splitName, centerX, colStartY + 4, { align: 'center' });
+            });
+        });
+
+        doc.save(`OptikFormlar_${session.name}_${hall.name}.pdf`);
+    };
+
     const isPrinted = (sessionId: string, departmentId: string, hallId: string) => {
         return hallListPrintStatuses.some(s => s.sessionId === sessionId && s.departmentId === departmentId && s.hallId === hallId && s.isPrinted);
     };
 
     // --- RENDER REPORT VIEW ---
     if (selectedReport) {
-        const exam = exams.find(e => e.id === selectedReport.session.examId);
-        
         return (
-            <div className="bg-gray-100 min-h-screen print:bg-white flex flex-col">
+            <div className="bg-white min-h-screen print:bg-white flex flex-col">
                 {/* Controls */}
                 <div className="p-4 bg-gray-100 border-b flex justify-between items-center print:hidden sticky top-0 z-10 shadow-sm">
                     <button 
@@ -124,12 +238,19 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                         &larr; Geri Dön
                     </button>
                     <div className="flex space-x-3">
+                        <button
+                            onClick={() => handleGeneratePDF(selectedReport.session, selectedReport.department, selectedReport.hall, selectedReport.courses)}
+                            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold flex items-center transition-colors shadow-sm"
+                        >
+                            <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+                            PDF Hazırla
+                        </button>
                         <button 
                             onClick={handlePrint}
                             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center transition-colors shadow-sm"
                         >
                             <PrinterIcon className="h-5 w-5 mr-2" />
-                            Yazdır
+                            Raporla / Yazdır
                         </button>
                         <button 
                             onClick={handleComplete}
@@ -141,131 +262,14 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                     </div>
                 </div>
 
-                {/* Report Content - Optic Forms */}
-                <div className="p-8 print:p-0 print:w-full">
-                    {selectedReport.students.length > 0 ? (
-                        selectedReport.students.map((student) => (
-                            <div key={student.id} className="bg-white w-[210mm] h-[297mm] mx-auto mb-8 relative shadow-lg print:shadow-none print:mb-0 print:break-after-page overflow-hidden font-sans text-black box-border border border-gray-200 print:border-none">
-                                
-                                {/* Trigger Marks (4 Corners) */}
-                                <div className="absolute top-8 left-8 w-4 h-4 bg-black print:block"></div>
-                                <div className="absolute top-8 right-8 w-4 h-4 bg-black print:block"></div>
-                                <div className="absolute bottom-8 left-8 w-4 h-4 bg-black print:block"></div>
-                                <div className="absolute bottom-8 right-8 w-4 h-4 bg-black print:block"></div>
-
-                                {/* Content Container */}
-                                <div className="p-12 h-full flex flex-col">
-                                    
-                                    {/* Header with Logo */}
-                                    <div className="flex items-center justify-center mb-4 border-b-2 border-black pb-2">
-                                        <img 
-                                            src="https://cdn.trakya.edu.tr/images/logolar/tu_armasi_renkli_tr.png" 
-                                            alt="Trakya Üniversitesi" 
-                                            className="h-20 w-20 object-contain mr-4"
-                                        />
-                                        <div className="text-center">
-                                            <h1 className="text-2xl font-bold uppercase">T.C. TRAKYA ÜNİVERSİTESİ</h1>
-                                            <h2 className="text-lg font-semibold uppercase">{selectedReport.department.name}</h2>
-                                            <h3 className="text-md font-medium uppercase mt-1">CEVAP KAĞIDI</h3>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-row gap-8 mb-2">
-                                        {/* LEFT SIDE: ID INFO - Moved up 2mm (mt-[-2mm] to pull up relative to flow) */}
-                                        <div className="w-1/2 flex flex-col gap-3 -mt-[2mm]">
-                                            <div className="border-2 border-black rounded-lg p-3 space-y-2">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold uppercase text-gray-600">Öğrenci Numarası</span>
-                                                    <span className="font-mono text-lg font-bold tracking-widest">{student.studentNumber}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold uppercase text-gray-600">Adı</span>
-                                                    <span className="font-bold text-base uppercase truncate">{student.firstName}</span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold uppercase text-gray-600">Soyadı</span>
-                                                    <span className="font-bold text-base uppercase truncate">{student.lastName}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Signature Area - Narrower */}
-                                            <div className="border-2 border-black rounded-lg p-2 h-20 flex flex-col justify-between">
-                                                <span className="text-[10px] font-bold uppercase text-center block">ÖĞRENCİ İMZASI</span>
-                                                <span className="text-[9px] text-center text-gray-500 leading-tight block px-1">
-                                                    Kitapçık türünü doğru kodladığımı ve bilgilerimin doğruluğunu onaylıyorum.
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* RIGHT SIDE: CODING & INFO */}
-                                        <div className="w-1/2 flex flex-col">
-                                            {/* Student Number Coding - Moved down 2mm, No Border */}
-                                            <div className="mt-[2mm] mb-3">
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-[10px] font-bold uppercase mb-1">Öğrenci Numarası Kodlama</span>
-                                                    <div className="flex gap-1">
-                                                        {student.studentNumber.split('').map((digit, idx) => (
-                                                            <div key={idx} className="flex flex-col gap-[2px]">
-                                                                <div className="w-5 h-6 border border-black flex items-center justify-center font-bold bg-gray-100 mb-[1px] text-xs">
-                                                                    {digit}
-                                                                </div>
-                                                                {[0,1,2,3,4,5,6,7,8,9].map(num => (
-                                                                    <div key={num} className={`w-5 h-5 rounded-full border border-black flex items-center justify-center text-[9px] ${String(num) === digit ? 'bg-black text-white' : ''}`}>
-                                                                        {num}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Exam Info - Below coding area */}
-                                            <div className="border-2 border-black rounded-lg p-2 bg-gray-50 text-xs space-y-1">
-                                                <div className="flex justify-between"><span className="font-bold">Sınav:</span> <span className="truncate ml-2">{exam?.name}</span></div>
-                                                <div className="flex justify-between"><span className="font-bold">Oturum:</span> <span>{selectedReport.session.name}</span></div>
-                                                <div className="flex justify-between"><span className="font-bold">Tarih:</span> <span>{new Date(selectedReport.session.date).toLocaleString()}</span></div>
-                                                <div className="flex justify-between"><span className="font-bold">Salon:</span> <span>{selectedReport.hall.name}</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* BOTTOM: COURSES (ANSWERS) - Moved down 3mm */}
-                                    <div className="mt-[3mm] flex-1 border-t-2 border-black pt-4">
-                                        <div className="grid grid-cols-4 gap-2 h-full">
-                                            {selectedReport.courses.slice(0, 4).map((course) => (
-                                                <div key={course.id} className="flex flex-col h-full">
-                                                    <div className="font-bold text-[10px] text-center mb-1 border-b border-black pb-1 h-8 flex items-center justify-center leading-tight bg-gray-100 px-1">
-                                                        {course.code}<br/>{course.name.substring(0, 15)}
-                                                    </div>
-                                                    <div className="flex-1 flex flex-col gap-[2px]">
-                                                        {[...Array(20)].map((_, qIdx) => (
-                                                            <div key={qIdx} className="flex items-center justify-between text-[9px]">
-                                                                <span className="font-bold w-3 text-right mr-[2px]">{qIdx + 1}</span>
-                                                                <div className="flex gap-[2px]">
-                                                                    {['A','B','C','D','E'].map(opt => (
-                                                                        <div key={opt} className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center font-bold hover:bg-black hover:text-white cursor-pointer">
-                                                                            {opt}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {/* Fill empty columns if less than 4 courses to maintain layout structure if needed, or just leave empty space */}
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center p-10 bg-white rounded-xl shadow-md border border-gray-200 print:hidden">
-                            <p className="text-gray-500 text-lg">Bu salonda kayıtlı öğrenci bulunamadı.</p>
-                        </div>
-                    )}
+                {/* Report Content - Placeholder for screen */}
+                <div className="p-8 print:p-0 flex justify-center">
+                    <div className="w-[210mm] h-[297mm] border-2 border-gray-300 bg-white shadow-lg flex items-center justify-center text-gray-400 flex-col">
+                        <QrCodeIcon className="h-16 w-16 mb-4 opacity-50" />
+                        <p className="font-bold text-lg">Optik Form Baskı Önizleme</p>
+                        <p className="text-sm mt-2">Formları indirmek için "PDF Hazırla" butonunu kullanınız.</p>
+                        <p className="text-xs mt-4 text-gray-400">Bu ekran sadece bilgilendirme amaçlıdır. Yazdırma işlemi PDF üzerinden yapılmalıdır.</p>
+                    </div>
                 </div>
             </div>
         );
@@ -325,15 +329,11 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                                                                         {printed && (
                                                                             <div className="flex items-center text-xs font-bold bg-green-50 px-2 py-1 rounded-full text-green-600 border border-green-100">
                                                                                 <CheckCircleIcon className="h-3 w-3 mr-1" />
-                                                                                Yazdırıldı
+                                                                                Hazırlandı
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    
-                                                                    <div className="mb-3 text-xs text-gray-500">
-                                                                        Kapasite: {hall.capacity}
-                                                                    </div>
-
+                                                                    <div className="mb-3 text-xs text-gray-500">Kapasite: {hall.capacity}</div>
                                                                     <button
                                                                         onClick={() => handleShowReport(item.session, deptItem.dept, hall, deptItem.courses)}
                                                                         className="w-full flex justify-center items-center px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium text-sm transition-colors"
@@ -357,12 +357,6 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                             </div>
                         </div>
                     ))}
-                    
-                    {treeData.length === 0 && (
-                        <div className="text-center p-10 bg-white rounded-xl shadow-md">
-                            <p className="text-gray-500">Bu sınava ait oturum bulunamadı.</p>
-                        </div>
-                    )}
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center flex-1 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 p-12">
