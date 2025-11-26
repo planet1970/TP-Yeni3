@@ -25,7 +25,10 @@ import {
   DocumentDuplicateIcon,
   HandRaiseIcon,
   CheckBadgeIcon,
-  ArchiveBoxIcon
+  ArchiveBoxIcon,
+  BadgeIcon,
+  PencilSquareIcon,
+  StackIcon
 } from './icons';
 
 interface NavItemProps {
@@ -74,15 +77,17 @@ const NavItem: React.FC<NavItemProps> = ({ item, isActive, onNavigate }) => {
 interface SidebarProps {
   activePage: string;
   onNavigate: (pageState: { page: string }) => void;
+  isOpen?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, isOpen }) => {
     // State to track which sections are open. Defaulting all to true for initial visibility.
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
         management: true,
         exam_ops: true,
         attendant_ops: true,
         task_ops: true,
+        teacher_ops: true,
     });
 
     const toggleSection = (sectionId: string) => {
@@ -90,6 +95,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
             ...prev,
             [sectionId]: !prev[sectionId]
         }));
+    };
+
+    // Helper to close sidebar on navigation if on mobile
+    const handleNavigation = (pageState: { page: string }) => {
+        onNavigate(pageState);
     };
 
     const navItemsYonetim: NavItemType[] = [
@@ -124,11 +134,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
     const navItemsGorev: NavItemType[] = [
         { id: 'task-request', name: 'Görev İste', icon: HandRaiseIcon, path: '#' },
         { id: 'task-accept', name: 'Görev Kabul', icon: CheckBadgeIcon, path: '#' },
+        { id: 'task-cards', name: 'Görev Kartı', icon: BadgeIcon, path: '#' },
         { id: 'task-archive', name: 'Arşiv', icon: ArchiveBoxIcon, path: '#' },
     ];
 
+    const navItemsOgretmen: NavItemType[] = [
+        { id: 'teacher-exam-definition', name: 'Sınav Tanımlama', icon: PencilSquareIcon, path: '#' },
+        { id: 'teacher-question-bank', name: 'Soru Bankası', icon: StackIcon, path: '#' },
+    ];
+
   return (
-    <aside className="w-64 bg-custom-dark-blue text-white flex flex-col h-screen flex-shrink-0 print:hidden overflow-hidden">
+    <aside className={`
+        w-64 bg-custom-dark-blue text-white flex flex-col h-screen 
+        fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out
+        lg:translate-x-0 lg:static lg:inset-auto shrink-0 print:hidden
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+    `}>
       <div className="flex items-center justify-between p-4 mb-2 shrink-0">
         <div className="flex items-center">
           <SchoolIcon className="h-8 w-8 text-orange-400" />
@@ -136,7 +157,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+      {/* Added style to hide scrollbar but allow scrolling */}
+      <nav className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style>
+            {`
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
+                }
+            `}
+        </style>
         
         {/* YÖNETİM Section */}
         <div>
@@ -154,7 +183,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                     key={item.id} 
                     item={item} 
                     isActive={activePage === item.id}
-                    onNavigate={onNavigate}
+                    onNavigate={handleNavigation}
                     />
                 ))}
                 </ul>
@@ -177,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                     key={item.id} 
                     item={item} 
                     isActive={activePage === item.id}
-                    onNavigate={onNavigate}
+                    onNavigate={handleNavigation}
                     />
                 ))}
                 </ul>
@@ -200,7 +229,30 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                     key={item.id} 
                     item={item} 
                     isActive={activePage === item.id}
-                    onNavigate={onNavigate}
+                    onNavigate={handleNavigation}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
+
+        {/* ÖĞRETMEN Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('teacher_ops')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-4 hover:text-white focus:outline-none"
+            >
+                <span>ÖĞRETMEN</span>
+                {openSections['teacher_ops'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['teacher_ops'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsOgretmen.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={handleNavigation}
                     />
                 ))}
                 </ul>
@@ -223,7 +275,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                     key={item.id} 
                     item={item} 
                     isActive={activePage === item.id}
-                    onNavigate={onNavigate}
+                    onNavigate={handleNavigation}
                     />
                 ))}
                 </ul>
@@ -235,7 +287,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                 <NavItem 
                   item={{ id: 'settings', name: 'Ayarlar', icon: SettingsIcon, path: '#' }} 
                   isActive={activePage === 'settings'}
-                  onNavigate={onNavigate}
+                  onNavigate={handleNavigation}
                 />
              </ul>
         </div>
