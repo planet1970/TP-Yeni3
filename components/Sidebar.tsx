@@ -28,7 +28,10 @@ import {
   ArchiveBoxIcon,
   BadgeIcon,
   PencilSquareIcon,
-  StackIcon
+  StackIcon,
+  AcademicCapIcon,
+  ListBulletIcon,
+  QrCodeIcon
 } from './icons';
 
 interface NavItemProps {
@@ -86,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, isOpen }) => 
         management: true,
         exam_ops: true,
         attendant_ops: true,
+        exam_center_ops: true,
         task_ops: true,
         teacher_ops: true,
     });
@@ -128,7 +132,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, isOpen }) => 
         { id: 'attendants', name: 'Görevliler', icon: BriefcaseIcon, path: '#' },
         { id: 'attendant-assignments', name: 'Görevli Tanımla', icon: ClipboardCheckIcon, path: '#' },
         { id: 'signature-lists', name: 'İmza Listeleri', icon: DocumentTextIcon, path: '#' },
-        { id: 'hall-lists', name: 'Salon Listeleri', icon: DocumentDuplicateIcon, path: '#' },
+        { id: 'hall-lists', name: 'Salon Listeleri (Eski)', icon: DocumentDuplicateIcon, path: '#' },
+    ];
+
+    const navItemsSinavMerkezi: NavItemType[] = [
+        { id: 'exam-center-hall-lists', name: 'Salon Listeleri', icon: ListBulletIcon, path: '#' },
+        { id: 'exam-center-optic-forms', name: 'Optik Formlar', icon: QrCodeIcon, path: '#' },
     ];
 
     const navItemsGorev: NavItemType[] = [
@@ -139,8 +148,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, isOpen }) => 
     ];
 
     const navItemsOgretmen: NavItemType[] = [
-        { id: 'teacher-exam-definition', name: 'Sınav Tanımlama', icon: PencilSquareIcon, path: '#' },
         { id: 'teacher-question-bank', name: 'Soru Bankası', icon: StackIcon, path: '#' },
+        { id: 'teacher-exam-definition', name: 'Sınav Oluştur', icon: PencilSquareIcon, path: '#' },
     ];
 
   return (
@@ -225,6 +234,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, isOpen }) => 
             {openSections['attendant_ops'] && (
                 <ul className="space-y-2 mb-4">
                 {navItemsGorevli.map((item) => (
+                    <NavItem 
+                    key={item.id} 
+                    item={item} 
+                    isActive={activePage === item.id}
+                    onNavigate={handleNavigation}
+                    />
+                ))}
+                </ul>
+            )}
+        </div>
+
+        {/* SINAV MERKEZİ Section */}
+        <div>
+            <button 
+                onClick={() => toggleSection('exam_center_ops')}
+                className="w-full flex justify-between items-center text-xs text-gray-400 uppercase tracking-wider mb-3 mt-4 hover:text-white focus:outline-none"
+            >
+                <span>SINAV MERKEZİ</span>
+                {openSections['exam_center_ops'] ? <ChevronDownIcon className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+            </button>
+            {openSections['exam_center_ops'] && (
+                <ul className="space-y-2 mb-4">
+                {navItemsSinavMerkezi.map((item) => (
                     <NavItem 
                     key={item.id} 
                     item={item} 

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { TrashIcon, BookOpenIcon, CheckBadgeIcon } from '../components/icons';
+import { TrashIcon, BookOpenIcon, CheckBadgeIcon, ArrowUturnLeftIcon } from '../components/icons';
 import type { Exam, School, Department, Course, ExamCourse } from '../types';
 
 interface ExamCoursesPageProps {
@@ -11,6 +11,7 @@ interface ExamCoursesPageProps {
     examCourses: ExamCourse[];
     onAddExamCourse: (examId: string, courseId: string, questionCount: number, duration: number) => void;
     onRemoveExamCourse: (examId: string, courseId: string) => void;
+    onRevertToDraft?: (examId: string, courseId: string) => void; // Optional to support previous implementation if needed
 }
 
 const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
@@ -21,6 +22,7 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
     examCourses,
     onAddExamCourse,
     onRemoveExamCourse,
+    onRevertToDraft
 }) => {
     const [selectedExamId, setSelectedExamId] = useState<string>('');
     const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
@@ -79,7 +81,7 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
         }
         
         if (ec.isConfirmed) {
-            return { status: 'ADDED', label: 'Eklendi', disabled: true, color: 'bg-blue-100 text-blue-700', duration: ec.duration };
+            return { status: 'ADDED', label: 'Eklendi', disabled: true, color: 'bg-blue-100 text-blue-700', duration: ec.duration, canRevert: true };
         }
 
         // Teacher Workflow States
@@ -88,7 +90,7 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
         }
 
         if (ec.status === 'READY') {
-            return { status: 'READY', label: 'Ekle', disabled: false, color: 'bg-green-100 text-green-700 hover:bg-green-200', duration: ec.duration };
+            return { status: 'READY', label: 'Ekle', disabled: false, color: 'bg-green-100 text-green-700 hover:bg-green-200', duration: ec.duration, canRevert: true };
         }
         
         // Fallback
@@ -193,13 +195,27 @@ const ExamCoursesPage: React.FC<ExamCoursesPageProps> = ({
                                                         {status.duration ? `${status.duration} dk` : '-'}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <button
-                                                            onClick={() => handleAddCourse(course.id)}
-                                                            disabled={status.disabled}
-                                                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${status.color} ${status.disabled ? 'cursor-not-allowed' : ''}`}
-                                                        >
-                                                            {status.label}
-                                                        </button>
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            {/* Add/Added Button */}
+                                                            <button
+                                                                onClick={() => handleAddCourse(course.id)}
+                                                                disabled={status.disabled}
+                                                                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${status.color} ${status.disabled ? 'cursor-not-allowed' : ''}`}
+                                                            >
+                                                                {status.label}
+                                                            </button>
+
+                                                            {/* Revert to Draft Button */}
+                                                            {status.canRevert && onRevertToDraft && (
+                                                                <button
+                                                                    onClick={() => onRevertToDraft(selectedExamId, course.id)}
+                                                                    className="p-1 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors"
+                                                                    title="Düzenlemeyi Aç (Taslağa Çek)"
+                                                                >
+                                                                    <ArrowUturnLeftIcon className="h-4 w-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );

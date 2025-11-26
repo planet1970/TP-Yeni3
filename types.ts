@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export interface NavItemType {
@@ -206,4 +205,14 @@ export interface ExamCourseQuestion {
     courseId: string;
     questionId: string;
     points: number; // Points are now specific to the Exam context
+}
+
+// --- Exam Center Types ---
+export interface HallListPrintStatus {
+    id: string;
+    sessionId: string;
+    departmentId: string;
+    hallId: string;
+    isPrinted: boolean;
+    printedAt?: string;
 }

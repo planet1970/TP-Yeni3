@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { PencilSquareIcon, BookOpenIcon, StackIcon, TrashIcon, CheckBadgeIcon, CurrencyDollarIcon, CheckCircleIcon, PlusIcon, MinusIcon } from '../components/icons';
 import type { Teacher, Exam, Course, ExamCourse, Question, ExamCourseQuestion, Topic } from '../types';
@@ -170,7 +169,11 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
     const [duration, setDuration] = useState(0);
     const [questionCount, setQuestionCount] = useState(0);
     
+    // Validation State
+    const [errors, setErrors] = useState<{ duration: boolean; count: boolean }>({ duration: false, count: false });
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(true); // To toggle between View/Edit mode
 
     const activeExams = useMemo(() => exams.filter(e => e.isActive), [exams]);
 
@@ -182,22 +185,28 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
 
     // Load existing data when course changes
     useEffect(() => {
+        // Reset errors on course change
+        setErrors({ duration: false, count: false });
+
         if (selectedExamId && selectedCourseId) {
             const ec = examCourses.find(e => e.examId === selectedExamId && e.courseId === selectedCourseId);
             if (ec) {
                 setInstructions(ec.instructions || '');
                 setDuration(ec.duration || 0);
                 setQuestionCount(ec.questionCount || 0);
+                setIsEditMode(false); // Load in view mode (saved state)
             } else {
                 // Defaults for a new exam-course relation
                 setInstructions('');
-                setDuration(30); // Default 30 mins
-                setQuestionCount(20); // Default 20 questions
+                setDuration(0); 
+                setQuestionCount(0); 
+                setIsEditMode(true); // New entry, start in edit mode
             }
         } else {
             setInstructions('');
             setDuration(0);
             setQuestionCount(0);
+            setIsEditMode(true);
         }
     }, [selectedExamId, selectedCourseId, examCourses]);
 
@@ -236,6 +245,20 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
     const handleSaveDefinition = () => {
         if (!selectedExamId || !selectedCourseId) return;
         
+        // VALIDATION: Check for 0 or empty values
+        const isCountInvalid = questionCount <= 0;
+        const isDurationInvalid = duration <= 0;
+
+        setErrors({
+            count: isCountInvalid,
+            duration: isDurationInvalid
+        });
+
+        if (isCountInvalid || isDurationInvalid) {
+            // Visual validation is handled by red borders, maybe show a toast too
+            return;
+        }
+
         onUpdateExamCourse({
             id: existingEC ? existingEC.id : '',
             examId: selectedExamId,
@@ -247,7 +270,16 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
             status: 'DRAFT' // Explicitly set to Draft on save
         });
         
+        setIsEditMode(false); // Lock inputs after save
         alert('Sınav ayarları kaydedildi. Durum: TASLAK');
+    };
+
+    const handleEditClick = () => {
+        if (isReady) {
+            alert('Bu sınav işleme alındığı için değişiklik yapılamaz.');
+            return;
+        }
+        setIsEditMode(true);
     };
 
     const handleSubmitExam = () => {
@@ -286,7 +318,7 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center">
                     <PencilSquareIcon className="h-8 w-8 mr-2 text-orange-500" />
-                    Sınav Tanımlama
+                    Sınav Oluştur
                 </h2>
                 
                 <div className="flex items-center bg-white p-2 rounded-lg shadow-sm border border-orange-200">
@@ -380,49 +412,60 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                                             rows={4}
                                             value={instructions}
                                             onChange={(e) => setInstructions(e.target.value)}
-                                            disabled={isReady}
+                                            disabled={!isEditMode}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
                                             placeholder="Sınav kuralları ve açıklamaları..."
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Soru Sayısı (Hedef)</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Soru Sayısı (Hedef)
+                                            {errors.count && <span className="text-red-500 ml-1 text-xs">* Gerekli</span>}
+                                        </label>
                                         <input
                                             type="number"
                                             value={questionCount}
                                             onChange={(e) => setQuestionCount(parseInt(e.target.value) || 0)}
-                                            disabled={isReady}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
+                                            disabled={!isEditMode}
+                                            className={`w-full px-3 py-2 border rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 ${
+                                                errors.count ? 'border-red-500 ring-1 ring-red-200 bg-red-50' : 'border-gray-300'
+                                            }`}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Sınav Süresi (Dakika)</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Sınav Süresi (Dakika)
+                                            {errors.duration && <span className="text-red-500 ml-1 text-xs">* Gerekli</span>}
+                                        </label>
                                         <input
                                             type="number"
                                             value={duration}
                                             onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-                                            disabled={isReady}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
+                                            disabled={!isEditMode}
+                                            className={`w-full px-3 py-2 border rounded-md focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 ${
+                                                errors.duration ? 'border-red-500 ring-1 ring-red-200 bg-red-50' : 'border-gray-300'
+                                            }`}
                                         />
                                     </div>
                                     
-                                    {isReady ? (
-                                        <button 
-                                            onClick={() => {
-                                                if (confirm('Sınavı tekrar taslak moduna almak istiyor musunuz? Yönetici onayı verilmişse bu işlem önerilmez.')) {
-                                                    onUpdateExamCourse({ ...existingEC!, status: 'DRAFT' });
-                                                }
-                                            }}
-                                            className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium shadow-sm text-sm"
-                                        >
-                                            Düzenlemeyi Aç (Taslak Yap)
-                                        </button>
-                                    ) : (
+                                    {isEditMode ? (
                                         <button 
                                             onClick={handleSaveDefinition}
                                             className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
                                         >
                                             Ayarları Kaydet
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={handleEditClick}
+                                            disabled={isReady}
+                                            className={`w-full py-2 rounded-lg transition-colors font-medium shadow-sm ${
+                                                isReady 
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                                : 'bg-orange-500 text-white hover:bg-orange-600'
+                                            }`}
+                                        >
+                                            Güncelle
                                         </button>
                                     )}
                                 </div>
@@ -473,9 +516,15 @@ const TeacherExamDefinitionPage: React.FC<TeacherExamDefinitionPageProps> = ({
                                         Puanları Eşitle
                                     </button>
                                     <button 
-                                        onClick={() => setIsModalOpen(true)}
-                                        disabled={!isAdded || isReady}
-                                        title={!isAdded ? "Önce ayarları kaydediniz" : isReady ? "Sınav hazır durumdayken soru eklenemez" : ""}
+                                        onClick={() => {
+                                            if (isReady) {
+                                                alert('Bu sınav işleme alındığı için değişiklik yapılamaz.');
+                                                return;
+                                            }
+                                            setIsModalOpen(true);
+                                        }}
+                                        disabled={!isAdded}
+                                        title={!isAdded ? "Önce ayarları kaydediniz" : isReady ? "Bu sınav işleme alındığı için değişiklik yapılamaz." : ""}
                                         className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-sm ${
                                             !isAdded || isReady
                                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
