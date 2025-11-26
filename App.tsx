@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
@@ -24,13 +23,17 @@ import SessionInquiryPage from './pages/SessionInquiryPage';
 import TaskRequestPage from './pages/TaskRequestPage';
 import TaskAcceptPage from './pages/TaskAcceptPage';
 import TaskArchivePage from './pages/TaskArchivePage';
-import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, Attendant, StudentCourseRegistration, StudentHallAssignment, AttendantAssignment, TaskRequest } from './types';
+import TaskCardsPage from './pages/TaskCardsPage';
+import TeacherExamDefinitionPage from './pages/TeacherExamDefinitionPage';
+import TeacherQuestionBankPage from './pages/TeacherQuestionBankPage';
+import { School, Department, Building, Hall, Course, Exam, Session, SessionCourse, SessionDepartment, ExamCourse, ExamHall, SessionHall, Student, Teacher, Attendant, StudentCourseRegistration, StudentHallAssignment, AttendantAssignment, TaskRequest, Question, ExamCourseQuestion } from './types';
 import { 
   BellIcon, 
   CogIcon, 
   MoonIcon, 
   SearchIcon, 
-  ClockIcon
+  ClockIcon,
+  MenuIcon
 } from './components/icons';
 
 interface PageState {
@@ -77,8 +80,8 @@ const allDepartmentsData: Department[] = [
 ];
 
 const initialBuildingsData: Building[] = [
-    { id: 'B001', name: 'Edebiyat Fakültesi - A Blok', description: 'Merkez Kampüs Girişi' },
-    { id: 'B002', name: 'İİBF - B Blok', description: 'Kütüphane Yanı' },
+    { id: 'B001', name: 'Edebiyat Fakültesi - A Blok', description: 'Merkez Kampüs Girişi', contact: '0284 235 00 00' },
+    { id: 'B002', name: 'İİBF - B Blok', description: 'Kütüphane Yanı', contact: '0284 235 00 01' },
 ];
 
 const allHallsData: Hall[] = [
@@ -142,25 +145,35 @@ const initialStudentsData: Student[] = [
     { id: 'ST-2582634027', studentNumber: '2582634027', firstName: 'HİLAL', lastName: 'AKGÜN KOKALA' }
 ];
 
-// Empty initial associations, but users can link them easily now that base data is there
+const initialExamCoursesData: ExamCourse[] = [
+    // Mock data assumed to be confirmed for initial view
+    { id: 'EC001', examId: 'E001', courseId: 'C001', questionCount: 20, duration: 30, isConfirmed: true },
+    { id: 'EC002', examId: 'E001', courseId: 'C002', questionCount: 25, duration: 40, isConfirmed: true },
+];
+
 const initialSessionCoursesData: SessionCourse[] = [];
-const initialExamCoursesData: ExamCourse[] = [];
 const initialExamHallsData: ExamHall[] = [];
 const initialSessionDepartmentsData: SessionDepartment[] = [];
 const initialSessionHallsData: SessionHall[] = [];
 
 
-const Header: React.FC = () => {
+const Header: React.FC<{ onToggleSidebar: () => void }> = ({ onToggleSidebar }) => {
   return (
     <header className="bg-white p-4 flex justify-between items-center shadow-sm print:hidden">
-      <h1 className="text-xl font-bold text-gray-700">WELCOME!</h1>
+      <div className="flex items-center">
+        {/* Mobile Menu Button */}
+        <button onClick={onToggleSidebar} className="mr-4 text-gray-600 hover:text-gray-900 lg:hidden">
+            <MenuIcon className="h-6 w-6" />
+        </button>
+        <h1 className="text-xl font-bold text-gray-700 hidden sm:block">HOŞ GELDİNİZ!</h1>
+      </div>
       <div className="flex items-center space-x-4">
-        <div className="relative">
+        <div className="relative hidden sm:block">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search..."
-            className="pl-10 pr-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+            placeholder="Ara..."
+            className="pl-10 pr-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 w-64"
           />
         </div>
         <button className="text-gray-500 hover:text-gray-700">
@@ -170,10 +183,10 @@ const Header: React.FC = () => {
           <BellIcon className="h-6 w-6" />
           <span className="absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">3</span>
         </button>
-        <button className="text-gray-500 hover:text-gray-700">
+        <button className="text-gray-500 hover:text-gray-700 hidden sm:block">
           <CogIcon className="h-6 w-6" />
         </button>
-        <button className="text-gray-500 hover:text-gray-700">
+        <button className="text-gray-500 hover:text-gray-700 hidden sm:block">
             <ClockIcon className="h-6 w-6" />
         </button>
         <div className="flex items-center space-x-2">
@@ -190,6 +203,7 @@ const Header: React.FC = () => {
 
 const App: React.FC = () => {
   const [activePage, setActivePage] = useState<PageState>({ page: 'dashboard' });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Persistent State using localStorage - KEY NAMES UPDATED TO _v1 TO LOAD NEW MOCK DATA
   const [schools, setSchools] = usePersistedState<School[]>('ems_schools_v1', initialSchoolsData);
@@ -216,9 +230,14 @@ const App: React.FC = () => {
   const [attendantAssignments, setAttendantAssignments] = usePersistedState<AttendantAssignment[]>('ems_attendantAssignments_v1', []);
   const [taskRequests, setTaskRequests] = usePersistedState<TaskRequest[]>('ems_taskRequests_v1', []);
 
+  // Teacher Module State
+  const [questions, setQuestions] = usePersistedState<Question[]>('ems_questions_v1', []);
+  const [examCourseQuestions, setExamCourseQuestions] = usePersistedState<ExamCourseQuestion[]>('ems_examCourseQuestions_v1', []);
+
 
   const handleNavigate = (pageState: PageState) => {
     setActivePage(pageState);
+    setIsSidebarOpen(false); // Close sidebar on mobile when navigating
   };
 
   // --- School CRUD Handlers ---
@@ -355,18 +374,45 @@ const App: React.FC = () => {
     };
 
     // --- ExamCourse Handlers ---
+    // This handler is used by ADMIN to Confirm the course or TEACHER to upsert definition
     const handleAddExamCourse = (examId: string, courseId: string, questionCount: number, duration: number) => {
-        if (examCourses.some(ec => ec.examId === examId && ec.courseId === courseId)) {
-            return;
-        }
-        const newEC: ExamCourse = {
-            id: `EC${Date.now()}`,
-            examId,
-            courseId,
-            questionCount,
-            duration
-        };
-        setExamCourses([...examCourses, newEC]);
+        // Admin "Adding" implies confirming the existing definition
+        setExamCourses(prev => {
+            const existing = prev.find(ec => ec.examId === examId && ec.courseId === courseId);
+            if (existing) {
+                return prev.map(ec => ec.id === existing.id ? { ...existing, isConfirmed: true } : ec);
+            } else {
+                // Should not ideally happen if workflow is Teacher Defined -> Admin Confirms
+                // But fallback for manual admin entry if allowed
+                return [...prev, {
+                    id: `EC${Date.now()}`,
+                    examId,
+                    courseId,
+                    questionCount,
+                    duration,
+                    isConfirmed: true
+                }];
+            }
+        });
+    };
+
+    // Updated to handle definition updates (instructions, etc.) AND inserting new ones if they don't exist
+    const handleUpdateExamCourse = (examCourseData: ExamCourse) => {
+        setExamCourses(prev => {
+            const existing = prev.find(ec => ec.examId === examCourseData.examId && ec.courseId === examCourseData.courseId);
+            if (existing) {
+                // Update existing, preserve ID and existing confirmed status unless explicitly changed
+                return prev.map(ec => ec.id === existing.id ? { ...existing, ...examCourseData } : ec);
+            } else {
+                // Add new if it doesn't exist (Upsert) - Default not confirmed
+                const newEC: ExamCourse = {
+                    ...examCourseData,
+                    id: examCourseData.id || `EC${Date.now()}`,
+                    isConfirmed: examCourseData.isConfirmed || false 
+                };
+                return [...prev, newEC];
+            }
+        });
     };
 
     const handleRemoveExamCourse = (examId: string, courseId: string) => {
@@ -549,11 +595,61 @@ const App: React.FC = () => {
         setTaskRequests(prev => prev.filter(r => !(r.attendantId === attendantId && r.sessionId === sessionId)));
     };
 
+    // --- Question Handlers ---
+    const handleAddQuestion = (questionData: Omit<Question, 'id'>) => {
+        const newQuestion: Question = {
+            id: `Q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            ...questionData
+        };
+        setQuestions(prev => [newQuestion, ...prev]);
+    };
+
+    const handleUpdateQuestion = (updatedQuestion: Question) => {
+        setQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
+    };
+
+    const handleDeleteQuestion = (questionId: string) => {
+        setQuestions(prev => prev.filter(q => q.id !== questionId));
+        // Also remove from exam assignments
+        setExamCourseQuestions(prev => prev.filter(ecq => ecq.questionId !== questionId));
+    };
+
+    // --- Exam Question Assignment Handlers ---
+    const handleAssignQuestionsToExam = (examId: string, courseId: string, questionIds: string[]) => {
+        setExamCourseQuestions(prev => {
+            // Filter out duplicates that already exist for this pair to avoid duplicate keys or entries
+            const existingIds = new Set(prev.filter(ecq => ecq.examId === examId && ecq.courseId === courseId).map(ecq => ecq.questionId));
+            
+            const newAssignments = questionIds
+                .filter(qid => !existingIds.has(qid))
+                .map(qid => ({
+                    id: `ECQ-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                    examId,
+                    courseId,
+                    questionId: qid
+                }));
+                
+            return [...prev, ...newAssignments];
+        });
+    };
+
+    const handleRemoveQuestionFromExam = (examId: string, courseId: string, questionId: string) => {
+        setExamCourseQuestions(prev => prev.filter(ecq => !(ecq.examId === examId && ecq.courseId === courseId && ecq.questionId === questionId)));
+    };
+
 
   const renderContent = () => {
     switch (activePage.page) {
       case 'dashboard':
-        return <DashboardPage />;
+        return <DashboardPage 
+                  students={students}
+                  teachers={teachers}
+                  attendants={attendants}
+                  exams={exams}
+                  sessions={sessions}
+                  courses={courses}
+                  schools={schools}
+               />;
       case 'schools':
         return <SchoolsPage 
                   schools={schools}
@@ -681,6 +777,15 @@ const App: React.FC = () => {
                     buildings={buildings}
                     halls={halls}
                 />;
+      case 'task-cards':
+          return <TaskCardsPage
+                    attendants={attendants}
+                    assignments={attendantAssignments}
+                    exams={exams}
+                    sessions={sessions}
+                    buildings={buildings}
+                    halls={halls}
+                />;
       case 'exams':
         return <ExamsPage
                     exams={exams}
@@ -793,16 +898,59 @@ const App: React.FC = () => {
                     buildings={buildings}
                     schools={schools}
                 />;
+      // --- Teacher Module Routes ---
+      case 'teacher-question-bank':
+          return <TeacherQuestionBankPage
+                    teachers={teachers}
+                    courses={courses}
+                    questions={questions}
+                    onAddQuestion={handleAddQuestion}
+                    onUpdateQuestion={handleUpdateQuestion}
+                    onDeleteQuestion={handleDeleteQuestion}
+                />;
+      case 'teacher-exam-definition':
+          return <TeacherExamDefinitionPage
+                    teachers={teachers}
+                    exams={exams}
+                    courses={courses}
+                    examCourses={examCourses}
+                    questions={questions}
+                    examCourseQuestions={examCourseQuestions}
+                    onUpdateExamCourse={handleUpdateExamCourse}
+                    onAssignQuestions={handleAssignQuestionsToExam}
+                    onRemoveQuestionFromExam={handleRemoveQuestionFromExam}
+                />;
       default:
-        return <DashboardPage />;
+        return <DashboardPage 
+                  students={students}
+                  teachers={teachers}
+                  attendants={attendants}
+                  exams={exams}
+                  sessions={sessions}
+                  courses={courses}
+                  schools={schools}
+               />;
     }
   };
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
-      <Sidebar activePage={activePage.page} onNavigate={handleNavigate} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+      <Sidebar 
+        activePage={activePage.page} 
+        onNavigate={handleNavigate} 
+        isOpen={isSidebarOpen}
+      />
+      
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <Header onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6 print:p-0 print:bg-white print:overflow-visible">
           {renderContent()}
         </main>
