@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { PrinterIcon, CheckCircleIcon, QrCodeIcon, DocumentArrowDownIcon } from '../components/icons';
+import { PrinterIcon, CheckCircleIcon, QrCodeIcon, DocumentArrowDownIcon, DocumentPlusIcon } from '../components/icons';
 import type { Exam, Session, Department, Hall, Student, SessionDepartment, SessionHall, SessionCourse, Course, StudentHallAssignment, StudentCourseRegistration, Attendant, AttendantAssignment, HallListPrintStatus } from '../types';
 import { jsPDF } from 'jspdf';
 
@@ -22,20 +22,12 @@ interface ExamCenterOpticFormsPageProps {
     onMarkAsPrinted: (sessionId: string, departmentId: string, hallId: string) => void;
 }
 
-interface ReportData {
-    session: Session;
-    department: Department;
-    hall: Hall;
-    courses: Course[];
-}
-
 const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
     exams, sessions, departments, halls, courses, students,
     sessionDepartments, sessionHalls, sessionCourses,
     studentHallAssignments, hallListPrintStatuses, onMarkAsPrinted
 }) => {
     const [selectedExamId, setSelectedExamId] = useState('');
-    const [selectedReport, setSelectedReport] = useState<ReportData | null>(null);
 
     const activeExams = useMemo(() => exams.filter(e => e.isActive), [exams]);
 
@@ -71,26 +63,6 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
         });
     }, [selectedExamId, sessions, sessionDepartments, departments, sessionHalls, halls, sessionCourses, courses]);
 
-    const handleShowReport = (session: Session, department: Department, hall: Hall, coursesList: Course[]) => {
-        setSelectedReport({
-            session,
-            department,
-            hall,
-            courses: coursesList
-        });
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleComplete = () => {
-        if (selectedReport) {
-            onMarkAsPrinted(selectedReport.session.id, selectedReport.department.id, selectedReport.hall.id);
-            setSelectedReport(null);
-        }
-    };
-
     // Helper to convert Turkish chars to ASCII approximation for standard fonts
     const tr = (text: string) => {
         return text
@@ -102,6 +74,11 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
             .replace(/Ç/g, "C").replace(/ç/g, "c");
     };
 
+    // --- GRID CONSTANTS (52x74) ---
+    const CELL_W = 210 / 52; // ~4.03mm
+    const CELL_H = 297 / 74; // ~4.01mm
+
+    // --- 1. OVERLAY PDF GENERATION (For Pre-Printed Forms) ---
     const handleGeneratePDF = (session: Session, department: Department, hall: Hall, coursesList: Course[]) => {
         const assignedStudentIds = studentHallAssignments
             .filter(sha => 
@@ -126,156 +103,303 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
         assignedStudents.forEach((student, index) => {
             if (index > 0) doc.addPage();
 
-            // --- 1. HEADER ---
+            // --- 1. HEADER (Exam Name Only) ---
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(249, 115, 22); // Orange
-            doc.setFontSize(14); 
-            doc.text(tr("TRAKYA UNIVERSITESI"), 105, 18, { align: 'center' });
-            
-            doc.setTextColor(0, 0, 0); // Black
+            doc.setTextColor(0, 0, 0); 
             doc.setFontSize(10);
-            doc.text(tr((exam?.name || "").toUpperCase()), 105, 24, { align: 'center' });
+            // Row ~7 (approx 28mm)
+            (doc as any).text(tr((exam?.name || "").toUpperCase()), 105, 7 * CELL_H, { align: 'center' });
 
             // --- 2. STUDENT NUMBER (Top Right Grid) ---
-            // Adjusted to fit the grid on the right
-            const snBoxX = 153.5; 
-            const snBoxY = 34;
-            const snGap = 4.7; 
-            const snVGap = 4.7; 
+            // Start at Row 10, Column ~36 to fit 10 digits
+            // Previous 8 cols started at 38. Shifting left by 2 cols.
+            const startCol = 36;
+            const startRow = 10;
             
-            const studentNumStr = student.studentNumber.padEnd(10, ' ');
+            // 10 Digits
+            const studentNumStr = student.studentNumber.padEnd(10, ' ').substring(0, 10);
             
-            for (let col = 0; col < 10; col++) {
-                const char = studentNumStr[col] || '';
-                const xPos = snBoxX + (col * snGap);
+            for (let i = 0; i < 10; i++) {
+                const char = studentNumStr[i] || '';
+                const digit = parseInt(char);
+                const colX = (startCol + i) * CELL_W; // X position for this digit column
                 
-                // Digit
+                // Draw Digit at Row 10
+                const digitY = startRow * CELL_H + 3; // +3 adjustment for baseline
                 doc.setFontSize(9);
-                doc.setTextColor(0);
-                doc.text(char, xPos + 1.75, snBoxY + 3, { align: 'center' });
+                doc.setTextColor(0, 0, 0);
+                (doc as any).text(char, colX + (CELL_W/2), digitY, { align: 'center' });
 
-                // Filled Bubbles Only
-                for (let row = 0; row < 10; row++) {
-                    const isFilled = char === String(row);
-                    if (isFilled) {
-                        const yPos = snBoxY + 8.5 + (row * snVGap); 
-                        const centerX = xPos + 1.75;
-                        
-                        doc.setFillColor(0); 
-                        doc.circle(centerX, yPos, 1.6, 'F'); 
-                    }
+                // Mark Bubble if digit is valid (0-9)
+                // Logic: 0 -> +1 row, 1 -> +2 rows, etc.
+                if (!isNaN(digit)) {
+                    // Bubbles start at Row 12 (leaving 1 row gap after digits)
+                    const bubbleStartRow = 12; 
+                    const bubbleY = (bubbleStartRow + digit) * CELL_H + (CELL_H/2);
+                    const bubbleX = colX + (CELL_W/2);
+                    
+                    doc.setFillColor(0, 0, 0); 
+                    doc.circle(bubbleX, bubbleY, 1.6, 'F'); 
                 }
             }
 
-            // --- 3. SALON / SIRA NO (RED BOX - 1. Kutu) ---
-            // X: ~112mm (Indent from the checkboxes area)
-            // Y: Starts around 35-36mm
-            const infoBoxX = 112; 
-            const salonY = 36;  
-            const siraY = 42;
+            // --- 3. SALON / SIRA / IDENTITY ---
+            // Salon/Sira Box: Left side ~Col 4, Row 10
+            const infoCol = 4;
+            const infoRow = 10;
             
             doc.setFontSize(9); 
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0);
-            
-            // Value only (Labels are pre-printed)
-            doc.text(tr(hall.name), infoBoxX + 20, salonY); 
-            doc.text(String(index + 1), infoBoxX + 20, siraY);
 
-            // --- 4. IDENTITY INFO (BLUE BOX - 2. Kutu) ---
-            // Y: Starts around 53-54mm
-            const numaraY = 54;
-            const adiY = 60;
-            const soyadiY = 66;
-            const bolumuY = 72;
-            
-            doc.text(student.studentNumber, infoBoxX + 20, numaraY); 
-            doc.text(tr(student.firstName), infoBoxX + 20, adiY); 
-            doc.text(tr(student.lastName), infoBoxX + 20, soyadiY); 
-            
+            // Salon: Row 10
+            (doc as any).text(tr(hall.name), (infoCol + 6) * CELL_W, infoRow * CELL_H + 3); 
+            // Sira: Row 11.5 (approx)
+            (doc as any).text(String(index + 1), (infoCol + 6) * CELL_W, (infoRow + 1.5) * CELL_H + 3);
+
+            // Identity Box: Starts ~Row 14
+            const idRow = 14;
+            // Numara: Row 14
+            (doc as any).text(student.studentNumber, (infoCol + 6) * CELL_W, idRow * CELL_H + 3); 
+            // Ad: Row 15.5
+            (doc as any).text(tr(student.firstName), (infoCol + 6) * CELL_W, (idRow + 1.5) * CELL_H + 3); 
+            // Soyad: Row 17
+            (doc as any).text(tr(student.lastName), (infoCol + 6) * CELL_W, (idRow + 3) * CELL_H + 3); 
+            // Bolum: Row 18.5
             doc.setFontSize(7); 
             const splitDept = doc.splitTextToSize(tr(department.name), 60);
-            doc.text(splitDept, infoBoxX + 20, bolumuY); 
+            (doc as any).text(splitDept, (infoCol + 6) * CELL_W, (idRow + 4.5) * CELL_H + 3); 
 
-            // --- 5. COURSE COLUMNS (Bottom) ---
-            const colStartY = 114; 
-            const colWidth = 35.6; 
-            const colGap = 2; 
-            const leftMargin = 10; 
+
+            // --- 4. COURSE COLUMNS (Bottom) ---
+            // Start ~Row 28
+            const courseStartRow = 28;
+            const colWidthCols = 8; // ~32mm width per column
+            const colGapCols = 1; // Gap between columns
+            const startCourseCol = 4; // Left margin
             
             coursesList.slice(0, 5).forEach((course, cIdx) => {
-                const colX = leftMargin + (cIdx * (colWidth + colGap));
-                const centerX = colX + (colWidth / 2);
+                const currentCol = startCourseCol + (cIdx * (colWidthCols + colGapCols));
+                const colX = currentCol * CELL_W;
+                const centerX = colX + ((colWidthCols * CELL_W) / 2);
+                const startY = courseStartRow * CELL_H;
 
-                doc.setFontSize(8);
+                // Course Code & Name
+                doc.setFontSize(6); 
                 doc.setFont("helvetica", "normal");
-                doc.setTextColor(0);
-                doc.text(course.code, centerX, colStartY, { align: 'center' });
+                doc.setTextColor(0, 0, 0);
                 
-                doc.setFontSize(6);
-                const splitName = doc.splitTextToSize(tr(course.name), colWidth - 4);
-                doc.text(splitName, centerX, colStartY + 4, { align: 'center' });
+                (doc as any).text(course.code, centerX, startY + 3, { align: 'center' });
+                const splitName = doc.splitTextToSize(tr(course.name), (colWidthCols * CELL_W) - 4);
+                (doc as any).text(splitName, centerX, startY + 6, { align: 'center' });
             });
         });
 
-        doc.save(`OptikFormlar_${session.name}_${hall.name}.pdf`);
+        doc.save(`${session.name} - ${hall.name}.pdf`);
+        onMarkAsPrinted(session.id, department.id, hall.id);
+    };
+
+    // --- 2. FULL FORM GENERATION (For Blank Paper) ---
+    const handleGenerateFullFormPDF = (session: Session, department: Department, hall: Hall, coursesList: Course[]) => {
+        const assignedStudentIds = studentHallAssignments
+            .filter(sha => 
+                sha.sessionId === session.id && 
+                sha.departmentId === department.id && 
+                sha.hallId === hall.id
+            )
+            .map(sha => sha.studentId);
+
+        const assignedStudents = students
+            .filter(s => assignedStudentIds.includes(s.id))
+            .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
+
+        if (assignedStudents.length === 0) {
+            alert('Bu salonda öğrenci bulunmamaktadır.');
+            return;
+        }
+
+        const exam = exams.find(e => e.id === session.examId);
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        
+        assignedStudents.forEach((student, index) => {
+            if (index > 0) doc.addPage();
+
+            // --- 1. HEADER ---
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(249, 115, 22);
+            doc.setFontSize(16);
+            (doc as any).text(tr("TRAKYA UNIVERSITESI"), 105, 15, { align: 'center' });
+            
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(10);
+            (doc as any).text(tr("SINAV UYGULAMA VE ARASTIRMA MERKEZI"), 105, 20, { align: 'center' });
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            (doc as any).text(tr((exam?.name || "").toUpperCase()), 105, 28, { align: 'center' });
+
+            doc.setFontSize(14);
+            doc.setTextColor(249, 115, 22);
+            doc.text("CEVAP KAGIDI", 15, 35);
+
+            // --- 2. STUDENT NUMBER GRID (Row 10, Col 36 - Adjusted for 10 digits) ---
+            const startCol = 36;
+            const startRow = 10;
+            const gridW = 10 * CELL_W; // 10 columns wide
+            const gridH = 12 * CELL_H; // Header + Digits + 10 Bubbles + Gaps
+
+            // Outer Box
+            doc.setDrawColor(0);
+            doc.rect(startCol * CELL_W, (startRow - 1) * CELL_H, gridW, gridH);
+            
+            // Header
+            doc.setFillColor(240, 240, 240);
+            doc.rect(startCol * CELL_W, (startRow - 1) * CELL_H, gridW, CELL_H, 'F');
+            doc.setFontSize(8);
+            doc.setTextColor(0, 0, 0);
+            (doc as any).text("OGRENCI NUMARANIZ", (startCol * CELL_W) + (gridW/2), (startRow - 0.2) * CELL_H, { align: 'center' });
+
+            const studentNumStr = student.studentNumber.padEnd(10, ' ').substring(0, 10);
+            
+            for (let i = 0; i < 10; i++) {
+                const char = studentNumStr[i] || '';
+                const digit = parseInt(char);
+                const colX = (startCol + i) * CELL_W;
+                
+                // Digit Box
+                doc.rect(colX, startRow * CELL_H, CELL_W, CELL_H);
+                (doc as any).text(char, colX + (CELL_W/2), startRow * CELL_H + 3, { align: 'center' });
+
+                // Bubbles 0-9
+                for (let j = 0; j < 10; j++) {
+                    const bubbleStartRow = 12; 
+                    const bubbleY = (bubbleStartRow + j) * CELL_H + (CELL_H/2);
+                    const bubbleX = colX + (CELL_W/2);
+                    
+                    const isFilled = digit === j;
+                    
+                    if (isFilled) {
+                        doc.setFillColor(0, 0, 0);
+                        doc.circle(bubbleX, bubbleY, 1.6, 'F');
+                    } else {
+                        doc.setDrawColor(100);
+                        doc.circle(bubbleX, bubbleY, 1.6, 'S');
+                        doc.setFontSize(5);
+                        doc.setTextColor(150, 150, 150);
+                        (doc as any).text(String(j), bubbleX, bubbleY + 0.5, { align: 'center' });
+                        doc.setTextColor(0, 0, 0);
+                    }
+                }
+            }
+
+            // --- 3. INFO BOXES (Left) ---
+            const infoX = 15;
+            const infoY = 40;
+            
+            // Warning Area
+            doc.setDrawColor(200);
+            doc.rect(infoX, infoY, 90, 35);
+            doc.setFontSize(6);
+            doc.setTextColor(150, 150, 150);
+            (doc as any).text("DIKKAT! Bu alanda isaretleme yapmayiniz.", infoX + 45, infoY + 3, { align: 'center' });
+            
+            // Info Fields (Salon/Identity) - Using Grid Logic
+            const infoCol = 28; // Approx Col for middle box
+            const infoRow = 10;
+            
+            // Salon Box
+            doc.setDrawColor(0);
+            doc.rect(infoCol * CELL_W, infoRow * CELL_H, 8 * CELL_W, 3 * CELL_H);
+            doc.setFontSize(6);
+            doc.setTextColor(0);
+            (doc as any).text("Salon No:", (infoCol + 0.2) * CELL_W, infoRow * CELL_H + 3);
+            (doc as any).text("Sira No:", (infoCol + 0.2) * CELL_W, (infoRow + 1.5) * CELL_H + 3);
+            
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            (doc as any).text(tr(hall.name), (infoCol + 3) * CELL_W, infoRow * CELL_H + 3);
+            (doc as any).text(String(index + 1), (infoCol + 3) * CELL_W, (infoRow + 1.5) * CELL_H + 3);
+
+            // Identity Box
+            const idRow = 14;
+            doc.rect(infoCol * CELL_W, idRow * CELL_H, 8 * CELL_W, 8 * CELL_H);
+            
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "normal");
+            (doc as any).text("Numarasi:", (infoCol + 0.2) * CELL_W, idRow * CELL_H + 3);
+            (doc as any).text("Adi:", (infoCol + 0.2) * CELL_W, (idRow + 1.5) * CELL_H + 3);
+            (doc as any).text("Soyadi:", (infoCol + 0.2) * CELL_W, (idRow + 3) * CELL_H + 3);
+            (doc as any).text("Bolumu:", (infoCol + 0.2) * CELL_W, (idRow + 4.5) * CELL_H + 3);
+
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            (doc as any).text(student.studentNumber, (infoCol + 3) * CELL_W, idRow * CELL_H + 3);
+            (doc as any).text(tr(student.firstName), (infoCol + 3) * CELL_W, (idRow + 1.5) * CELL_H + 3);
+            (doc as any).text(tr(student.lastName), (infoCol + 3) * CELL_W, (idRow + 3) * CELL_H + 3);
+            const deptSplit = doc.splitTextToSize(tr(department.name), 5 * CELL_W);
+            (doc as any).text(deptSplit, (infoCol + 3) * CELL_W, (idRow + 4.5) * CELL_H + 3);
+
+            // --- 4. COURSE COLUMNS (Bottom) ---
+            const courseStartRow = 28;
+            const colWidthCols = 8; 
+            const colGapCols = 1; 
+            const startCourseCol = 4; 
+            
+            coursesList.slice(0, 5).forEach((course, cIdx) => {
+                const currentCol = startCourseCol + (cIdx * (colWidthCols + colGapCols));
+                const colX = currentCol * CELL_W;
+                const centerX = colX + ((colWidthCols * CELL_W) / 2);
+                const startY = courseStartRow * CELL_H;
+
+                // Header
+                doc.setDrawColor(0);
+                doc.rect(colX, startY, colWidthCols * CELL_W, 4 * CELL_H);
+                
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "bold");
+                (doc as any).text(course.code, centerX, startY + 4, { align: 'center' });
+                
+                doc.setFontSize(6);
+                doc.setFont("helvetica", "normal");
+                const splitName = doc.splitTextToSize(tr(course.name), (colWidthCols * CELL_W) - 4);
+                (doc as any).text(splitName, centerX, startY + 8, { align: 'center' });
+
+                // Body
+                doc.rect(colX, (courseStartRow + 4) * CELL_H, colWidthCols * CELL_W, 28 * CELL_H);
+
+                // Bubbles (20 Qs)
+                for (let q = 1; q <= 20; q++) {
+                    const qRow = courseStartRow + 5 + (q * 1.2); // Rough spacing
+                    const yPos = qRow * CELL_H;
+                    
+                    doc.setFontSize(7);
+                    (doc as any).text(`${q}`, colX + 3, yPos + 1, { align: 'right' });
+                    
+                    const options = ['A', 'B', 'C', 'D', 'E'];
+                    const optStartX = colX + 8;
+                    const optGap = 4.5;
+                    
+                    options.forEach((opt, oIdx) => {
+                        const optX = optStartX + (oIdx * optGap);
+                        doc.setDrawColor(100);
+                        doc.circle(optX, yPos, 1.8, 'S');
+                        doc.setFontSize(5);
+                        doc.setTextColor(100);
+                        (doc as any).text(opt, optX, yPos + 0.5, { align: 'center' });
+                        doc.setTextColor(0);
+                    });
+                }
+            });
+        });
+
+        doc.save(`TamOptikForm_${session.name}_${hall.name}.pdf`);
+        onMarkAsPrinted(session.id, department.id, hall.id);
     };
 
     const isPrinted = (sessionId: string, departmentId: string, hallId: string) => {
         return hallListPrintStatuses.some(s => s.sessionId === sessionId && s.departmentId === departmentId && s.hallId === hallId && s.isPrinted);
     };
 
-    // --- RENDER REPORT VIEW ---
-    if (selectedReport) {
-        return (
-            <div className="bg-white min-h-screen print:bg-white flex flex-col">
-                {/* Controls */}
-                <div className="p-4 bg-gray-100 border-b flex justify-between items-center print:hidden sticky top-0 z-10 shadow-sm">
-                    <button 
-                        onClick={() => setSelectedReport(null)}
-                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                    >
-                        &larr; Geri Dön
-                    </button>
-                    <div className="flex space-x-3">
-                        <button
-                            onClick={() => handleGeneratePDF(selectedReport.session, selectedReport.department, selectedReport.hall, selectedReport.courses)}
-                            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold flex items-center transition-colors shadow-sm"
-                        >
-                            <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-                            PDF Hazırla
-                        </button>
-                        <button 
-                            onClick={handlePrint}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center transition-colors shadow-sm"
-                        >
-                            <PrinterIcon className="h-5 w-5 mr-2" />
-                            Raporla / Yazdır
-                        </button>
-                        <button 
-                            onClick={handleComplete}
-                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold flex items-center transition-colors shadow-sm"
-                        >
-                            <CheckCircleIcon className="h-5 w-5 mr-2" />
-                            Tamamlandı
-                        </button>
-                    </div>
-                </div>
-
-                {/* Report Content - Placeholder for screen */}
-                <div className="p-8 print:p-0 flex justify-center">
-                    <div className="w-[210mm] h-[297mm] border-2 border-gray-300 bg-white shadow-lg flex items-center justify-center text-gray-400 flex-col">
-                        <QrCodeIcon className="h-16 w-16 mb-4 opacity-50" />
-                        <p className="font-bold text-lg">Optik Form Baskı Önizleme</p>
-                        <p className="text-sm mt-2">Formları indirmek için "PDF Hazırla" butonunu kullanınız.</p>
-                        <p className="text-xs mt-4 text-gray-400">Bu ekran sadece bilgilendirme amaçlıdır. Yazdırma işlemi PDF üzerinden yapılmalıdır.</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // --- SELECTION VIEW ---
     return (
         <div className="container mx-auto h-full flex flex-col">
             <div className="flex justify-between items-center mb-6">
@@ -285,7 +409,6 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                 </h2>
             </div>
 
-            {/* Exam Selection */}
             <div className="bg-white p-6 rounded-xl shadow-md mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Aktif Sınav Seçiniz</label>
                 <select
@@ -320,12 +443,12 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                                                 
                                                 {deptItem.halls.length > 0 ? (
                                                     <ul className="space-y-3">
-                                                        {deptItem.halls.map(hall => {
-                                                            const printed = isPrinted(item.session.id, deptItem.dept.id, hall.id);
+                                                        {deptItem.halls.map(currentHall => {
+                                                            const printed = isPrinted(item.session.id, deptItem.dept.id, currentHall.id);
                                                             return (
-                                                                <li key={hall.id} className="bg-white border rounded-md p-3 hover:shadow-md transition-shadow">
+                                                                <li key={currentHall.id} className="bg-white border rounded-md p-3 hover:shadow-md transition-shadow">
                                                                     <div className="flex justify-between items-center mb-2">
-                                                                        <span className="font-bold text-lg text-gray-800">{hall.name}</span>
+                                                                        <span className="font-bold text-lg text-gray-800">{currentHall.name}</span>
                                                                         {printed && (
                                                                             <div className="flex items-center text-xs font-bold bg-green-50 px-2 py-1 rounded-full text-green-600 border border-green-100">
                                                                                 <CheckCircleIcon className="h-3 w-3 mr-1" />
@@ -333,14 +456,24 @@ const ExamCenterOpticFormsPage: React.FC<ExamCenterOpticFormsPageProps> = ({
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    <div className="mb-3 text-xs text-gray-500">Kapasite: {hall.capacity}</div>
-                                                                    <button
-                                                                        onClick={() => handleShowReport(item.session, deptItem.dept, hall, deptItem.courses)}
-                                                                        className="w-full flex justify-center items-center px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium text-sm transition-colors"
-                                                                    >
-                                                                        <PrinterIcon className="h-4 w-4 mr-2" />
-                                                                        Optik Formları Oluştur
-                                                                    </button>
+                                                                    <div className="mb-3 text-xs text-gray-500">Kapasite: {currentHall.capacity}</div>
+                                                                    
+                                                                    <div className="flex flex-col gap-2">
+                                                                        <button
+                                                                            onClick={() => handleGeneratePDF(item.session, deptItem.dept, currentHall, deptItem.courses)}
+                                                                            className="w-full flex justify-center items-center px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-medium text-sm transition-colors"
+                                                                        >
+                                                                            <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+                                                                            PDF Hazırla (Baskı)
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleGenerateFullFormPDF(item.session, deptItem.dept, currentHall, deptItem.courses)}
+                                                                            className="w-full flex justify-center items-center px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 font-medium text-sm transition-colors"
+                                                                        >
+                                                                            <DocumentPlusIcon className="h-4 w-4 mr-2" />
+                                                                            Tam Optik Form Oluştur
+                                                                        </button>
+                                                                    </div>
                                                                 </li>
                                                             );
                                                         })}
